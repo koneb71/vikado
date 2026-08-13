@@ -133,15 +133,19 @@ impl Keyframes {
     }
 }
 
-/// Green-screen removal. Semantics mirror ffmpeg's `chromakey` filter
-/// (YUV-distance keying); the preview shader implements the same math.
+/// Green-screen removal, keyed on decoded RGB: a pixel goes transparent when
+/// `length(rgb - color) / sqrt(3) < similarity`, ramping to opaque over
+/// `blend`. The renderer emits ffmpeg `colorkey` and the preview shader
+/// implements the same distance — deliberately NOT ffmpeg's YUV `chromakey`,
+/// whose limited-range plane comparison a browser cannot reproduce. See the
+/// CHROMA KEY CONTRACT comments in filtergraph.rs and shaders.ts.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ChromaKey {
     /// #rrggbb key color
     pub color: String,
-    /// YUV distance below which a pixel keys out (0.01..1)
+    /// normalized RGB distance below which a pixel keys out (0.01..1)
     pub similarity: f64,
     /// edge softness (0..1)
     pub blend: f64,
@@ -518,6 +522,46 @@ impl RenderOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The in-browser exporter has its own copy of this in
+    /// web/src/export/localExport.ts (`outputSize`), and the two engines must
+    /// agree or the same project exports at different sizes depending on which
+    /// one the user picked. These cases are mirrored in localExport.test.ts.
+    #[test]
+    fn output_size_matches_the_browser_exporter() {
+        let project = |w: u32, h: u32| {
+            let fixture = include_str!("../../../fixtures/minimal-project.json");
+            let mut p: Project = serde_json::from_str(fixture).unwrap();
+            p.width = w;
+            p.height = h;
+            p
+        };
+        let at = |w, h, scale| {
+            RenderOptions {
+                quality: RenderQuality::High,
+                scale,
+            }
+            .output_size(&project(w, h))
+        };
+
+        assert_eq!(at(1920, 1080, 1.0), (1920, 1080));
+        assert_eq!(at(1080, 1920, 1.0), (1080, 1920));
+        assert_eq!(at(1920, 1080, 0.5), (960, 540));
+        assert_eq!(at(1920, 1080, 0.75), (1440, 810));
+        // clamped to the supported range
+        assert_eq!(at(1920, 1080, 4.0), (1920, 1080));
+        assert_eq!(at(1920, 1080, 0.0), (480, 270));
+        // never zero, always even
+        let (w, h) = at(4, 2, 0.25);
+        assert!(w >= 2 && h >= 2);
+        for (w, h) in [(1918, 1080), (1280, 722), (1001, 999)] {
+            for scale in [1.0, 0.75, 0.5, 0.25] {
+                let (ow, oh) = at(w, h, scale);
+                assert_eq!(ow % 2, 0, "{w}x{h} @ {scale}");
+                assert_eq!(oh % 2, 0, "{w}x{h} @ {scale}");
+            }
+        }
+    }
 
     /// Round-trip the fixture project to catch schema drift against the
     /// TypeScript side (fixtures are saved by the frontend).

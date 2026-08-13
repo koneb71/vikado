@@ -1,37 +1,14 @@
-import { Compositor, type DrawLayer, type TexSource } from '@/engine/compositor/Compositor'
+import { Compositor } from '@/engine/compositor/Compositor'
 import { clipSpeed } from '@/lib/timelineOps'
-import { sampleTransform } from '@/lib/keyframes'
 import { AudioGraph } from '@/engine/AudioGraph'
 import { MediaPool } from '@/engine/MediaPool'
-import { renderText, textCacheKey } from '@/engine/TextRenderer'
-import {
-  activeCueAt,
-  audibleClipsAt,
-  visualLayersAt,
-  type AudibleClip,
-  type VisualLayer,
-} from '@/engine/activeClips'
-import {
-  DEFAULT_ADJUSTMENTS,
-  DEFAULT_TRANSFORM,
-  projectDuration,
-  type Asset,
-  type Clip,
-  type ImageClip,
-  type Project,
-  type Transition,
-  type VideoClip,
-} from '@/schema/project'
+import { audibleClipsAt, type AudibleClip } from '@/engine/activeClips'
+import { buildFrameLayers, mediaClipsAt, type BlurStore } from '@/engine/frameGraph'
+import { projectDuration, type Asset, type Project } from '@/schema/project'
 import { useProjectStore } from '@/state/projectStore'
 import { usePlaybackStore } from '@/state/playbackStore'
 
 const SYNC_TOLERANCE_S = 0.08
-
-function hexToRgb01(hex: string): [number, number, number] {
-  const m = /^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(hex)
-  if (!m) return [0, 1, 0]
-  return [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255]
-}
 
 /**
  * The rAF render loop: reads stores transiently (no React re-renders),
@@ -46,7 +23,7 @@ export class PlaybackController {
   private compositor: Compositor
   private audio = new AudioGraph()
   /** small 2D canvases used to build blurred backdrop textures, per clip */
-  private blurCanvases = new Map<string, { work: HTMLCanvasElement; out: HTMLCanvasElement }>()
+  private blurCanvases: BlurStore = new Map()
   private pool = new MediaPool({ onEvict: (id) => this.audio.disconnect(id) })
   private rafId = 0
   private watchdogId: ReturnType<typeof setInterval> | 0 = 0
@@ -165,26 +142,6 @@ export class PlaybackController {
     this.drawFrame(project, t)
   }
 
-  /** All media-backed clips on stage at t, including incoming transition clips. */
-  private stageClips(visual: VisualLayer[], t: number): { clip: Clip; sourceTime: number }[] {
-    const out: { clip: Clip; sourceTime: number }[] = []
-    for (const layer of visual) {
-      if (layer.clip.type === 'video' || layer.clip.type === 'image') {
-        const st =
-          layer.clip.type === 'video'
-            ? layer.clip.sourceIn + (t - layer.clip.start) * layer.clip.speed
-            : 0
-        out.push({ clip: layer.clip, sourceTime: st })
-      }
-      const b = layer.transition?.clip
-      if (b && (b.type === 'video' || b.type === 'image')) {
-        const st = b.type === 'video' ? Math.max(0, b.sourceIn + (t - b.start) * b.speed) : 0
-        out.push({ clip: b, sourceTime: st })
-      }
-    }
-    return out
-  }
-
   /** Pool key for an audible clip: detached audio clips get their OWN
    * element so they can't seek-fight the video clip sharing their asset. */
   private static audioKey(clip: AudibleClip['clip']): string {
@@ -195,8 +152,7 @@ export class PlaybackController {
   private syncMedia(project: Project, t: number, isPlaying: boolean): void {
     const audible = audibleClipsAt(project, t)
     const audibleByKey = new Map(audible.map((a) => [PlaybackController.audioKey(a.clip), a]))
-    const visual = visualLayersAt(project, t)
-    const stage = this.stageClips(visual, t)
+    const stage = mediaClipsAt(project, t)
 
     // key → what the element should be doing
     const needs = new Map<string, { asset: Asset; expected: number; speed: number }>()
@@ -256,285 +212,26 @@ export class PlaybackController {
   }
 
   /**
-   * Blurred, stage-filling copy of the clip's frame ("background blur" fill),
-   * matching the renderer's backdrop semantics: the source is first cropped /
-   * flipped / chroma-keyed like the clip itself, then aspect-preserving
-   * cover-cropped to the stage, then blurred. Exact blur-kernel parity
-   * (Canvas2D blur vs gblur) isn't attempted; geometry and content are.
+   * Draw the frame at `t`. The layer stack itself is built by the shared
+   * frameGraph module, which the in-browser exporter also uses — the preview
+   * and a local export are the same code path, so they cannot drift.
+   * Pixels come from the pool's media elements, which syncMedia has already
+   * seeked to the right source time.
    */
-  private backdropLayer(
-    clip: VideoClip | ImageClip,
-    el: TexSource,
-    mediaW: number,
-    mediaH: number,
-    opacity: number,
-    stageW: number,
-    stageH: number,
-  ): DrawLayer {
-    const outW = 192
-    const outH = Math.max(2, Math.round((outW * stageH) / stageW))
-    let pair = this.blurCanvases.get(clip.id)
-    if (!pair || pair.out.width !== outW || pair.out.height !== outH) {
-      const work = document.createElement('canvas')
-      const out = document.createElement('canvas')
-      work.width = out.width = outW
-      work.height = out.height = outH
-      pair = { work, out }
-      this.blurCanvases.set(clip.id, pair)
-    }
-    const wctx = pair.work.getContext('2d', { willReadFrequently: true })!
-
-    // source region = crop rect (clamped like the renderer), then a centered
-    // cover sub-rect of it with the stage's aspect
-    const crop = clip.crop
-    const cw = crop?.w ?? 1
-    const ch = crop?.h ?? 1
-    const cx = Math.max(0, Math.min(crop?.x ?? 0, 1 - cw))
-    const cy = Math.max(0, Math.min(crop?.y ?? 0, 1 - ch))
-    const rx = cx * mediaW
-    const ry = cy * mediaH
-    const rw = cw * mediaW
-    const rh = ch * mediaH
-    const targetAR = stageW / stageH
-    let sx = rx
-    let sy = ry
-    let sw = rw
-    let sh = rh
-    if (rw / rh > targetAR) {
-      sw = rh * targetAR
-      sx = rx + (rw - sw) / 2
-    } else {
-      sh = rw / targetAR
-      sy = ry + (rh - sh) / 2
-    }
-
-    try {
-      wctx.save()
-      wctx.filter = 'none'
-      wctx.setTransform(clip.flipH ? -1 : 1, 0, 0, clip.flipV ? -1 : 1,
-        clip.flipH ? outW : 0, clip.flipV ? outH : 0)
-      wctx.drawImage(el as CanvasImageSource, sx, sy, sw, sh, 0, 0, outW, outH)
-      wctx.restore()
-
-      // chroma key on the small canvas (same RGB-distance math as the shader)
-      if (clip.chromaKey) {
-        const [kr, kg, kb] = hexToRgb01(clip.chromaKey.color)
-        const { similarity, blend } = clip.chromaKey
-        const img = wctx.getImageData(0, 0, outW, outH)
-        const d = img.data
-        for (let i = 0; i < d.length; i += 4) {
-          const dr = d[i] / 255 - kr
-          const dg = d[i + 1] / 255 - kg
-          const db = d[i + 2] / 255 - kb
-          const diff = Math.sqrt(dr * dr + dg * dg + db * db) / Math.sqrt(3)
-          const a = blend > 0
-            ? Math.min(1, Math.max(0, (diff - similarity) / blend))
-            : diff < similarity ? 0 : 1
-          d[i + 3] = Math.round(d[i + 3] * a)
-        }
-        wctx.putImageData(img, 0, 0)
-      }
-
-      const octx = pair.out.getContext('2d')!
-      octx.clearRect(0, 0, outW, outH)
-      octx.filter = 'blur(5px)'
-      octx.drawImage(pair.work, 0, 0)
-      octx.filter = 'none'
-    } catch {
-      // source not ready — keep previous backdrop contents
-    }
-
-    return {
-      source: pair.out,
-      width: outW,
-      height: outH,
-      key: `bg:${clip.id}`,
-      dynamic: true,
-      fitMode: 'cover',
-      transform: DEFAULT_TRANSFORM,
-      adjustments: DEFAULT_ADJUSTMENTS,
-      filter: null,
-      opacity,
-    }
-  }
-
-  /** Build the DrawLayer for a media/text clip, or null when not drawable yet. */
-  private layerFor(
-    project: Project,
-    clip: Clip,
-    opacity: number,
-    localTime: number,
-  ): DrawLayer | null {
-    if (clip.type === 'video' || clip.type === 'image') {
-      const asset = project.assets.find((a) => a.id === clip.assetId)
-      const el = this.pool.peek(clip.assetId)
-      if (!asset || !el || el instanceof HTMLAudioElement) return null
-      if (el instanceof HTMLVideoElement && el.readyState < 2) return null
-      const transform = sampleTransform(clip, localTime)
-      const crop = clip.crop
-      // clamp x/y so the rect stays inside the frame (matches the renderer's
-      // crop clamp for hand-edited out-of-range project JSON)
-      const cropX = crop ? Math.max(0, Math.min(crop.x, 1 - crop.w)) : 0
-      const cropY = crop ? Math.max(0, Math.min(crop.y, 1 - crop.h)) : 0
-      return {
-        source: el,
-        width: (asset.width ?? 1) * (crop?.w ?? 1),
-        height: (asset.height ?? 1) * (crop?.h ?? 1),
-        key: clip.assetId,
-        dynamic: el instanceof HTMLVideoElement,
-        transform,
-        adjustments: clip.adjustments,
-        filter: clip.filter,
-        flipH: clip.flipH,
-        flipV: clip.flipV,
-        uvRect: crop ? [cropX, cropY, crop.w, crop.h] : undefined,
-        chromaKey: clip.chromaKey
-          ? {
-              rgb: hexToRgb01(clip.chromaKey.color),
-              similarity: clip.chromaKey.similarity,
-              blend: clip.chromaKey.blend,
-            }
-          : undefined,
-        opacity: transform.opacity * opacity,
-      }
-    }
-    if (clip.type === 'text') {
-      const rendered = renderText(clip.text, clip.style)
-      const transform = sampleTransform(clip, localTime)
-      return {
-        source: rendered.canvas,
-        width: rendered.width,
-        height: rendered.height,
-        key: textCacheKey(clip.text, clip.style),
-        dynamic: false,
-        fitMode: 'none',
-        transform,
-        adjustments: DEFAULT_ADJUSTMENTS,
-        filter: null,
-        opacity: transform.opacity * opacity,
-      }
-    }
-    return null
-  }
-
-  /**
-   * Transition blending without an extra render pass:
-   *  - crossfade: B drawn over A with opacity p
-   *  - fade-black: A fades out, then B fades in
-   *  - wipes: B scissored to the revealed region
-   *  - slides: B translated in from its edge
-   * The ffmpeg xfade output is the reference; these are visually equivalent
-   * for full-stage clips (the common case).
-   */
-  private pushTransitionLayers(
-    layers: DrawLayer[],
-    project: Project,
-    a: DrawLayer | null,
-    bClip: Clip,
-    type: Transition['type'],
-    p: number,
-    t: number,
-  ): void {
-    const b = this.layerFor(project, bClip, 1, Math.max(0, t - bClip.start))
-    const W = project.width
-    const H = project.height
-    switch (type) {
-      case 'crossfade':
-        if (a) layers.push(a)
-        if (b) layers.push({ ...b, opacity: b.opacity * p })
-        break
-      case 'fade-black':
-        if (p < 0.5) {
-          if (a) layers.push({ ...a, opacity: a.opacity * (1 - p * 2) })
-        } else if (b) {
-          layers.push({ ...b, opacity: b.opacity * ((p - 0.5) * 2) })
-        }
-        break
-      case 'wipe-left': // reveal B from the right edge moving left
-        if (a) layers.push(a)
-        if (b) layers.push({ ...b, scissor: [W * (1 - p), 0, W * p, H] })
-        break
-      case 'wipe-right':
-        if (a) layers.push(a)
-        if (b) layers.push({ ...b, scissor: [0, 0, W * p, H] })
-        break
-      case 'slide-left': // B slides in from the right
-        if (a) layers.push(a)
-        if (b) layers.push({ ...b, offsetX: W * (1 - p) })
-        break
-      case 'slide-right':
-        if (a) layers.push(a)
-        if (b) layers.push({ ...b, offsetX: -W * (1 - p) })
-        break
-    }
-  }
-
   private drawFrame(project: Project, t: number): void {
     this.compositor.setStageSize(project.width, project.height)
     this.compositor.setBackground(project.canvasBackground)
-    const layers: DrawLayer[] = []
-
-    for (const layer of visualLayersAt(project, t)) {
-      if (layer.transition) {
-        const a = this.layerFor(project, layer.clip, 1, layer.localTime)
-        this.pushTransitionLayers(
-          layers,
-          project,
-          a,
-          layer.transition.clip,
-          layer.transition.type,
-          layer.transition.progress,
-          t,
-        )
-      } else {
-        const l = this.layerFor(project, layer.clip, layer.fade, layer.localTime)
-        if (l) {
-          // blurred fill behind the clip (skipped inside transition windows)
-          if (
-            (layer.clip.type === 'video' || layer.clip.type === 'image') &&
-            layer.clip.backgroundBlur
-          ) {
-            const asset = project.assets.find(
-              (a) => 'assetId' in layer.clip && a.id === layer.clip.assetId,
-            )
-            layers.push(
-              this.backdropLayer(
-                layer.clip,
-                l.source,
-                asset?.width ?? 1,
-                asset?.height ?? 1,
-                layer.fade,
-                project.width,
-                project.height,
-              ),
-            )
-          }
-          layers.push(l)
-        }
-      }
-    }
-
-    // subtitles: bottom-center, 5% margin
-    const cueText = activeCueAt(project, t)
-    if (cueText && project.subtitles) {
-      const rendered = renderText(cueText, project.subtitles.style)
-      layers.push({
-        source: rendered.canvas,
-        width: rendered.width,
-        height: rendered.height,
-        key: textCacheKey(cueText, project.subtitles.style),
-        dynamic: false,
-        fitMode: 'none',
-        transform: {
-          ...DEFAULT_TRANSFORM,
-          y: project.height / 2 - rendered.height / 2 - project.height * 0.05,
-        },
-        adjustments: DEFAULT_ADJUSTMENTS,
-        filter: null,
-        opacity: 1,
-      })
-    }
-
+    const layers = buildFrameLayers(
+      project,
+      t,
+      (clip) => {
+        const el = this.pool.peek(clip.assetId)
+        if (!el || el instanceof HTMLAudioElement) return null
+        if (el instanceof HTMLVideoElement && el.readyState < 2) return null
+        return el
+      },
+      this.blurCanvases,
+    )
     this.compositor.draw(layers)
   }
 }

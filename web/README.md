@@ -68,11 +68,11 @@ pnpm lint
 | --- | --- |
 | `schema/` | `project.ts` — the zod project schema, the contract with the renderer. Also the filter preset matrices and the bundled font list. |
 | `generated/` | ts-rs output from the Rust `vikado-types` crate, plus the compile-time drift check. **Generated — never edit by hand.** |
-| `engine/` | Preview runtime: `PlaybackController` (rAF loop), `compositor/` (WebGL2 + GLSL), `AudioGraph`, `TextRenderer`, `MediaPool`. |
+| `engine/` | Preview runtime: `PlaybackController` (rAF loop), `frameGraph.ts` (the shared layer stack, also used by the exporter), `compositor/` (WebGL2 + GLSL), `AudioGraph`, `TextRenderer`, `MediaPool`. |
 | `editor/` | The UI: `timeline/` (pointer-event gestures, snapping), `sidebar/` panels, `inspector/`, `preview/`, hotkeys. |
 | `media/` | Import pipeline: content-addressed OPFS storage, the IndexedDB wrapper (saved projects plus the thumbnail and waveform caches), format probing, screen/webcam recording, thumbnails, waveforms. |
 | `captions/` | Auto-captions: a web worker running Whisper via `@huggingface/transformers`, plus PCM extraction and cue post-processing. |
-| `export/` | The render client (create job → upload assets → submit → SSE progress → download) and the export dialog. |
+| `export/` | Both export engines: `localExport.ts` renders and encodes in the browser with WebCodecs, `exportClient.ts` drives the render service (create job → upload assets → submit → SSE progress → download), and `ExportDialog.tsx` picks between them. |
 | `state/` | Zustand stores: `projectStore` (undoable, autosaved to IndexedDB), `playbackStore` (playhead and selection; transient), `uiStore` (timeline zoom, scroll, snapping, dock height; transient). |
 | `lib/` | Helpers shared across the app: timeline operations, keyframe sampling, clipboard, SRT parsing, freeze-frame capture, formatting. |
 | `components/ui/` | shadcn/ui primitives. |

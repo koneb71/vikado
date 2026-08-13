@@ -557,13 +557,42 @@ result.
 | --- | --- | --- | --- |
 | Colour adjustments | `web/src/engine/compositor/shaders.ts` (`LAYER_FRAG_SRC`) | `eq` + `lutrgb` in `filtergraph.rs` | brightness `b` → `eq brightness=b`; contrast `c` → `contrast=1+c`; saturation `s` → `saturation=1+s`; temperature `w` → shader `r += 0.1w, b -= 0.1w`, renderer `lutrgb` `±25.5w` (= `0.1 × 255`). Luma is BT.601 `(0.299, 0.587, 0.114)`, which is what `eq` uses. |
 | Filter presets | 4×4 matrices in `web/src/schema/filters.ts` | `preset_chain()` in `filtergraph.rs` | Same coefficients: sepia/grayscale matrices ↔ `colorchannelmixer`/`hue=s=0`, invert ↔ `negate`. Matrix offset columns are 0..1 and map to `lutrgb` offsets ×255 (vintage `.06/.05/.08` → `+15/+13/+20`; cool `+.02/+.03` → `+5/+8`; warm `+.03/+.02` → `+8/+5`). |
-| Chroma key | `LAYER_FRAG_SRC`: `length(rgb - key) / sqrt(3)`, alpha ramps over `[similarity, similarity+blend]` | `colorkey=color=…:similarity=…:blend=…` | Both key **decoded RGB** with euclidean distance. See the history below. The blurred-backdrop path repeats the same math on a Canvas2D `ImageData` in `PlaybackController.backdropLayer`. |
+| Chroma key | `LAYER_FRAG_SRC`: `length(rgb - key) / sqrt(3)`, alpha ramps over `[similarity, similarity+blend]` | `colorkey=color=…:similarity=…:blend=…` | Both key **decoded RGB** with euclidean distance. See the history below. The blurred-backdrop path repeats the same math on a Canvas2D `ImageData` in `frameGraph.backdropLayer`. |
 | Keyframes | `sampleTrack` / `easeProgress` in `web/src/lib/keyframes.ts` | `kf_expr()` in `filtergraph.rs` | Clamp outside the range; between keyframes interpolate with the **left** keyframe's easing. `linear → p`, `ease-in → p²`, `ease-out → p(2-p)`, `ease-in-out → p²(3-2p)`; the ffmpeg expression stores `p` in `st(0)` so the easing warp reuses it. Keyframe `t` is clip-local on both sides. |
-| Crop | `uvRect` uniform, `cropX = max(0, min(x, 1-w))` in `PlaybackController.layerFor` | `crop=…` with `x.min(1-w).max(0)` | Applied **before** the contain-fit on both sides, so fit math sees cropped dimensions. Both clamp identically so hand-edited JSON with `x + w > 1` renders the same. |
-| Transitions | `transitionWindow` + `pushTransitionLayers` | per-clip `ext_in`/`ext_out = d/2`, alpha ramps, `geq` wipe masks, overlay-`x` slides | Window is centred on the cut; each side needs `d/2` of source headroom; the incoming clip is blended **on top** of the outgoing one. |
+| Crop | `uvRect` uniform, `cropX = max(0, min(x, 1-w))` in `frameGraph.layerFor` | `crop=…` with `x.min(1-w).max(0)` | Applied **before** the contain-fit on both sides, so fit math sees cropped dimensions. Both clamp identically so hand-edited JSON with `x + w > 1` renders the same. |
+| Transitions | `transitionWindow` in `activeClips.ts` + `pushTransitionLayers` in `frameGraph.ts` | per-clip `ext_in`/`ext_out = d/2`, alpha ramps, `geq` wipe masks, overlay-`x` slides | Window is centred on the cut; each side needs `d/2` of source headroom; the incoming clip is blended **on top** of the outgoing one. |
 | Text and fonts | `TextRenderer` (Canvas2D) with the bundled webfonts | `ass.rs` → libass with `fontsdir` pointing at the same TTFs | `PlayResX/Y` = canvas size; `WrapStyle: 2`; explicit `\n` → `\N`. Left/right alignment moves the anchor `measuredWidth / 2 - 0.25 × fontSize` off the block centre (times `transform.scale`); the `0.25` is exactly the `PADDING` constant `TextRenderer` adds around the glyphs. `measuredWidth: 0` falls back to centred. |
 | Subtitles | drawn bottom-centre at `height/2 - h/2 - 0.05×height` | ASS `\an2` with `MarginV = 5%` of height | One shared style for all cues on both sides. |
 | Background blur | Canvas2D `blur(5px)` on a 192-px-wide cover-cropped copy | `gblur=sigma=30` on a full-resolution cover crop | Geometry and content match; the **kernel does not**. This is a knowingly approximate contract. |
+
+### Three implementations, two of them shared
+
+There are now three renderers of the same project, but only two implementations to keep
+in step:
+
+| | Frames come from | Composited by | Encoded by |
+| --- | --- | --- | --- |
+| Live preview | `<video>` elements the `PlaybackController` keeps seeked | `frameGraph` + `Compositor` | not encoded |
+| Export on this device | WebCodecs decode at an exact timestamp | `frameGraph` + `Compositor` | `VideoEncoder` via mediabunny |
+| Export on the service | ffmpeg decoders | the `filter_complex` graph | libx264 |
+
+The preview and the local export call the same `buildFrameLayers`, so they agree by
+construction — the only difference is that the exporter decodes an exact frame where the
+preview tolerates being within `SYNC_TOLERANCE_S` of it. The contracts in the table above
+therefore describe exactly one boundary: **the browser on one side, ffmpeg on the other.**
+
+The local exporter lives in `web/src/export/localExport.ts`. It walks `i / fps`, decodes
+whatever `mediaClipsAt` says is on screen, draws via the shared layer stack into an
+`OffscreenCanvas` at canvas resolution, downscales once if the export scale is below 100%
+(the same position in the chain as the renderer's final `scale`), and feeds the canvas to
+a `CanvasSource`. Audio is a single `OfflineAudioContext` pass: one `AudioBufferSourceNode`
+per audible clip, `playbackRate` carrying clip speed, and a gain envelope matching
+`fadeEnvelope`.
+
+One audio contract does **not** hold on the local path: `playbackRate` resamples, so a clip
+at a speed other than 1× is pitch-shifted, whereas `<video>` elements preserve pitch by
+default (`preservesPitch`) and ffmpeg's `atempo` is pitch-preserving by design. The export
+dialog detects affected projects and points at the render service.
 
 ### One known ordering gap
 

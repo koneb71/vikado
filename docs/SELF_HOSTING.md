@@ -1,5 +1,10 @@
 # Self-hosting Vikado
 
+> The render service is optional. Browsers with WebCodecs can export an MP4
+> locally with no server involved; host this when you want ffmpeg-quality output,
+> support for sources browsers cannot decode, or encoding done off the editing
+> machine. See the export section of the README for the trade-offs.
+
 Vikado splits into two halves. The editor is a single-page app that runs entirely in the
 browser: it stores projects in IndexedDB, media in OPFS, and does all editing and preview
 locally. The Rust render service (`vikado-server`) exists only to turn a finished project

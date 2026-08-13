@@ -159,14 +159,17 @@ web/src/schema           Hand-kept zod mirror of the schema: validation,
                          defaults, filter matrices, the bundled font list.
 web/src/generated        ts-rs output plus drift-check.ts. Generated; do not
                          hand-edit.
-web/src/engine           Preview: PlaybackController (rAF loop), the WebGL2
+web/src/engine           Preview: PlaybackController (rAF loop), frameGraph
+                         (the layer stack, shared with the exporter), the WebGL2
                          Compositor and shaders, AudioGraph, TextRenderer,
                          MediaPool.
 web/src/editor           UI: timeline, inspector, sidebar panels, preview area.
 web/src/media            Import, OPFS storage, metadata probing, thumbnails,
                          waveforms, screen and webcam recording.
 web/src/captions         In-browser Whisper transcription worker.
-web/src/export           Render client (job create, upload, SSE, download).
+web/src/export           Both export engines: localExport (WebCodecs, in the
+                         browser) and the render client (job create, upload,
+                         SSE, download).
 web/src/lib              Pure helpers: timeline operations, keyframes, SRT,
                          clipboard, clip factories, freeze frame.
 fixtures/                Tiny test media (fixtures/media) plus
@@ -339,6 +342,13 @@ rather than bumping the version.
    ```
 
 ## The preview/render parity rule
+
+Since the in-browser exporter landed, three things can render a project: the live
+preview, an export on the user's device, and an export on the render service. Only
+two implementations exist, though — the preview and the local export share
+`web/src/engine/frameGraph.ts`, so a visual feature added there is automatically
+correct in both. The rule below is therefore about one boundary: the browser
+implementation versus the ffmpeg one in `crates/vikado-renderer/src/filtergraph.rs`.
 
 This is the central design constraint of the project:
 

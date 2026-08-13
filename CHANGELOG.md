@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Export on this device.** The timeline can now be rendered and encoded entirely in
+  the browser, using the GPU compositor for frames and the platform's hardware H.264
+  encoder through WebCodecs, so an export no longer requires the render service. The
+  export dialog offers "This device" (the default where WebCodecs is available) or
+  "Render service", and both honour the existing quality tier and output scale.
+
+### Changed
+
+- The layer stack that describes a frame moved out of `PlaybackController` into
+  `web/src/engine/frameGraph.ts`. The live preview and the in-browser exporter now
+  call the same builder, so a local export cannot drift from the preview.
+
+### Known issues
+
+- Exporting on this device resamples sped-up audio, which raises its pitch; the
+  preview and the ffmpeg renderer both preserve pitch. The export dialog warns when a
+  project is affected. Use the render service for pitch-correct output.
+
 ## [0.1.0] - 2026-08-13
 
 Initial public release. Vikado is a local-first, web-based video editor: the browser

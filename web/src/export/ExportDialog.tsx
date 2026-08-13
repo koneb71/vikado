@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Download, Loader2, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Cpu, Download, Loader2, Server, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,13 +17,21 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/state/projectStore'
+import type { Project } from '@/schema/project'
 import {
   DEFAULT_RENDER_OPTIONS,
   startExport,
   type ExportHandle,
   type ExportProgress,
 } from '@/export/exportClient'
+import {
+  isLocalExportSupported,
+  outputSize,
+  startLocalExport,
+  type LocalExportHandle,
+} from '@/export/localExport'
 import type { RenderOptions } from '@/generated/RenderOptions'
 import type { RenderQuality } from '@/generated/RenderQuality'
 
@@ -39,6 +47,29 @@ const SCALE_OPTIONS = [
   { value: 0.5, label: '50%' },
 ]
 
+type Engine = 'local' | 'server'
+
+/**
+ * Clip speed is mixed by resampling in the browser (AudioBufferSourceNode has no
+ * pitch preservation), while both the preview and ffmpeg's atempo keep pitch.
+ * Warn rather than silently hand back chipmunk audio.
+ */
+function hasPitchShiftedAudio(project: Project | null): boolean {
+  if (!project) return false
+  return project.tracks.some(
+    (track) =>
+      !track.muted &&
+      track.clips.some((clip) => {
+        if (clip.type === 'audio') return clip.speed !== 1 && clip.volume > 0
+        if (clip.type === 'video') {
+          const asset = project.assets.find((a) => a.id === clip.assetId)
+          return clip.speed !== 1 && !clip.muted && clip.volume > 0 && !!asset?.hasAudio
+        }
+        return false
+      }),
+  )
+}
+
 export function ExportDialog({
   open,
   onOpenChange,
@@ -47,16 +78,36 @@ export function ExportDialog({
   onOpenChange: (o: boolean) => void
 }) {
   const [options, setOptions] = useState<RenderOptions>(DEFAULT_RENDER_OPTIONS)
+  const [engine, setEngine] = useState<Engine>('local')
+  const [localAvailable, setLocalAvailable] = useState<boolean | null>(null)
   const [state, setState] = useState<ExportProgress | null>(null)
   const [started, setStarted] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const handleRef = useRef<ExportHandle | null>(null)
+  const handleRef = useRef<ExportHandle | LocalExportHandle | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+
+  // capability probe: an older browser without WebCodecs falls back to the service
+  useEffect(() => {
+    let alive = true
+    void isLocalExportSupported().then((ok) => {
+      if (!alive) return
+      setLocalAvailable(ok)
+      if (!ok) setEngine('server')
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) {
       handleRef.current?.cancel()
       handleRef.current = null
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+        objectUrlRef.current = null
+      }
       setState(null)
       setStarted(false)
       setDownloadUrl(null)
@@ -68,6 +119,27 @@ export function ExportDialog({
     const project = useProjectStore.getState().project
     if (!project) return
     setStarted(true)
+
+    if (engine === 'local') {
+      const handle = startLocalExport(project, options, (p) =>
+        setState({
+          phase: p.phase === 'finalizing' ? 'rendering' : p.phase === 'preparing' ? 'uploading' : 'rendering',
+          progress: p.progress,
+        }),
+      )
+      handleRef.current = handle
+      handle.result
+        .then((blob) => {
+          const url = URL.createObjectURL(blob)
+          objectUrlRef.current = url
+          setDownloadUrl(url)
+        })
+        .catch((e: Error) => {
+          if (e.message !== 'canceled') setError(e.message)
+        })
+      return
+    }
+
     const handle = startExport(project, setState, options)
     handleRef.current = handle
     handle.downloadUrl
@@ -78,18 +150,18 @@ export function ExportDialog({
   }
 
   const project = useProjectStore.getState().project
-  const outSize = project
-    ? {
-        w: Math.max(2, Math.round((project.width * options.scale) / 2) * 2),
-        h: Math.max(2, Math.round((project.height * options.scale) / 2) * 2),
-      }
-    : null
+  const size = project ? outputSize(project, options) : null
+  const pitchWarning = hasPitchShiftedAudio(project)
 
   const phaseLabel =
     state?.phase === 'uploading'
-      ? 'Uploading media…'
+      ? engine === 'local'
+        ? 'Preparing…'
+        : 'Uploading media…'
       : state?.phase === 'rendering'
-        ? 'Rendering…'
+        ? engine === 'local'
+          ? 'Rendering on this device…'
+          : 'Rendering…'
         : null
   const percent = Math.round((state?.progress ?? 0) * 100)
 
@@ -109,13 +181,68 @@ export function ExportDialog({
               : error
                 ? 'The export failed.'
                 : started
-                  ? 'Rendering happens on the Vikado render service.'
+                  ? engine === 'local'
+                    ? 'Encoding with your GPU. Keep this tab open.'
+                    : 'Rendering on the Vikado render service.'
                   : 'Choose export settings.'}
           </DialogDescription>
         </DialogHeader>
 
         {!started ? (
           <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] text-muted-foreground">Render with</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={localAvailable === false}
+                  onClick={() => setEngine('local')}
+                  className={cn(
+                    'flex flex-col items-start gap-0.5 rounded-lg border p-2.5 text-left transition-colors',
+                    engine === 'local'
+                      ? 'border-primary bg-primary/10'
+                      : 'hover:border-primary/50',
+                    localAvailable === false && 'cursor-not-allowed opacity-40',
+                  )}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-medium">
+                    <Cpu className="size-3.5" /> This device
+                  </span>
+                  <span className="text-[10px] leading-snug text-muted-foreground">
+                    {localAvailable === false
+                      ? 'Not supported by this browser'
+                      : 'GPU encode, nothing uploaded'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEngine('server')}
+                  className={cn(
+                    'flex flex-col items-start gap-0.5 rounded-lg border p-2.5 text-left transition-colors',
+                    engine === 'server'
+                      ? 'border-primary bg-primary/10'
+                      : 'hover:border-primary/50',
+                  )}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-medium">
+                    <Server className="size-3.5" /> Render service
+                  </span>
+                  <span className="text-[10px] leading-snug text-muted-foreground">
+                    ffmpeg, uploads your media
+                  </span>
+                </button>
+              </div>
+              {engine === 'local' && pitchWarning && (
+                <p className="flex gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[10px] leading-snug text-amber-200">
+                  <AlertTriangle className="mt-px size-3 shrink-0" />
+                  <span>
+                    This project speeds up audio. Encoding here resamples it, so the pitch
+                    rises; the render service keeps the pitch unchanged.
+                  </span>
+                </p>
+              )}
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-[11px] text-muted-foreground">Quality</Label>
               <Select
@@ -153,9 +280,9 @@ export function ExportDialog({
                   ))}
                 </SelectContent>
               </Select>
-              {outSize && (
+              {size && (
                 <p className="text-[10px] text-muted-foreground">
-                  Output: {outSize.w}×{outSize.h} MP4 (H.264 + AAC)
+                  Output: {size[0]}×{size[1]} MP4 (H.264 + AAC)
                 </p>
               )}
             </div>

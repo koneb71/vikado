@@ -16,6 +16,10 @@ dist/
 # Vikado runtime data (per-job render workspaces)
 data/
 
+# ts-rs writes here when TS_RS_EXPORT_DIR is unset; the canonical generated
+# output is web/src/generated, which IS committed and drift-checked in CI.
+crates/vikado-types/bindings/
+
 # Fixture media copied into the dev server for in-browser testing.
 # Populate it when you need it:  cp fixtures/media/* web/public/fixtures/
 web/public/fixtures/

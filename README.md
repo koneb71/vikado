@@ -6,12 +6,15 @@
 A free, open-source, web-based video editor: multi-track timeline, effects,
 keyframe animation, text, subtitles and MP4 export.
 
-Vikado is local-first. All editing and preview happen in your browser — projects
-live in IndexedDB and media in OPFS, so your files never leave your machine until
-you export. Export is the one step that needs a server: a small stateless Rust
-service compiles your project into an ffmpeg command and hands back an MP4. That
-service ships as a single Docker container you can run yourself, so the whole
-editor is self-hostable and there is no account to create.
+Vikado is local-first. Editing, preview and export all happen in your browser —
+projects live in IndexedDB and media in OPFS, and the default export path encodes
+the MP4 on your own GPU, so your files need never leave the machine. There is no
+account to create.
+
+A small stateless Rust service is also included. It renders the same project with
+ffmpeg and is useful when a browser lacks WebCodecs, when a source file is one the
+browser cannot decode, or when you would rather not spend local CPU on encoding.
+It ships as a single Docker container, so the whole editor is self-hostable.
 
 ![How Vikado works: the browser edits and previews, a Rust service renders the MP4](docs/pipeline.svg)
 
@@ -74,10 +77,20 @@ editor is self-hostable and there is no account to create.
 
 ### Export
 
-- MP4 (H.264 video, AAC audio) rendered server-side by ffmpeg.
-- A quality tier (draft, standard or high) and an output scale (100%, 75% or 50%
-  of the canvas).
-- Live progress over server-sent events, then a download.
+Two engines produce the same MP4 (H.264 video, AAC audio); pick one at export time.
+
+- **This device.** The timeline is rendered with your GPU and encoded by the
+  browser's hardware H.264 encoder (WebCodecs). Nothing is uploaded and no server
+  is needed. Frames come from the same compositor that drives the preview, so the
+  file matches what you were watching. Used by default where the browser supports
+  it, and roughly real time — a six-second 1080p project encodes in a few seconds.
+- **Render service.** The project and its source files are uploaded to the Rust
+  service, which compiles them into an ffmpeg filter graph. Use it when the
+  browser lacks WebCodecs, for sources the browser cannot decode, or to keep
+  encoding off the machine you are editing on.
+
+Both offer a quality tier (draft, standard or high) and an output scale (100%,
+75% or 50% of the canvas), and both report live progress before the download.
 
 Project settings cover canvas size presets (1080p and 720p landscape, portrait and
 square), frame rate (24, 25, 30, 50 or 60) and the canvas background colour.
@@ -195,9 +208,14 @@ between releases. [CHANGELOG.md](CHANGELOG.md) records what landed in each versi
 Known limitations:
 
 - **The render service has no authentication.** Anyone who can reach it can submit
-  render jobs and download the results.
-- **Exporting requires the backend.** There is no client-side export path, so the
-  editor alone cannot produce an MP4.
+  render jobs and download the results. Exporting on your own device avoids the
+  service entirely.
+- **Exporting on this device changes the pitch of sped-up audio.** The browser mixes
+  clip speed by resampling, so a clip at 2x sounds an octave high; ffmpeg's `atempo`
+  and the live preview both preserve pitch. Export through the render service if a
+  project has audible clips at a speed other than 1x.
+- **Exporting on this device runs on the main thread.** The editor is unresponsive
+  while frames are encoded, and a long project holds the whole mix in memory.
 - **Text clips cannot be keyframe-animated.** The ASS exporter cannot express it, so
   the editor hides the keyframe toggles for text rather than let the preview drift
   from the export.

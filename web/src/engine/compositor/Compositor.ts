@@ -3,7 +3,13 @@ import { filterMatrix } from '@/schema/filters'
 import type { ColorAdjustments, FilterPreset, Transform } from '@/schema/project'
 
 /** Anything WebGL can upload as a texture each frame. */
-export type TexSource = HTMLVideoElement | HTMLCanvasElement | HTMLImageElement | ImageBitmap
+export type TexSource =
+  | HTMLVideoElement
+  | HTMLCanvasElement
+  | OffscreenCanvas
+  | HTMLImageElement
+  | ImageBitmap
+  | VideoFrame
 
 export interface DrawLayer {
   source: TexSource
