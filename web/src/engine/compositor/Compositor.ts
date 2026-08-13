@@ -269,7 +269,16 @@ export class Compositor {
     gl.disable(gl.SCISSOR_TEST)
   }
 
-  dispose(): void {
+  /**
+   * @param releaseContext force the WebGL2 context to be dropped as well.
+   *   Browsers cap live contexts (~16) and evict the oldest on overflow, and
+   *   each export builds a throwaway context, so the exporter asks for this to
+   *   avoid eventually evicting the preview's. The preview must NOT: its
+   *   canvas outlives the controller (a StrictMode remount reuses the node),
+   *   and getContext on a lost canvas hands back the lost context.
+   */
+  dispose(releaseContext = false): void {
     for (const key of [...this.textures.keys()]) this.releaseTexture(key)
+    if (releaseContext) this.gl.getExtension('WEBGL_lose_context')?.loseContext()
   }
 }

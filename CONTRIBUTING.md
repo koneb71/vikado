@@ -174,6 +174,11 @@ web/src/lib              Pure helpers: timeline operations, keyframes, SRT,
                          clipboard, clip factories, freeze frame.
 fixtures/                Tiny test media (fixtures/media) plus
                          minimal-project.json, both used by the Rust tests.
+                         portrait.mp4 is coded landscape with a 90-degree
+                         display matrix — use it whenever you touch how a
+                         decoded frame reaches the compositor, since that is
+                         the case where preview and export can disagree.
+                         rotate_tkhd.py regenerates that matrix.
 docker/                  Dockerfile (node build -> rust build -> debian+ffmpeg
                          runtime) and Dockerfile.dev.
 web/public/fonts/        The bundled OFL TTFs used by BOTH the browser preview

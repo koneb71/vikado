@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { outputSize } from '@/export/localExport'
-import { createProject, type Project } from '@/schema/project'
+import { fadeCurve, outputSize } from '@/export/localExport'
+import { fadeEnvelope } from '@/engine/activeClips'
+import { clipFromAsset } from '@/lib/clipFactory'
+import { createProject, type Asset, type Project, type VideoClip } from '@/schema/project'
 
 /**
  * outputSize mirrors RenderOptions::output_size in crates/vikado-types. Both
@@ -53,5 +55,71 @@ describe('outputSize', () => {
     const [w, h] = outputSize(project(4, 2), high(0.25))
     expect(w).toBeGreaterThanOrEqual(2)
     expect(h).toBeGreaterThanOrEqual(2)
+  })
+})
+
+/**
+ * The export's gain curve has to agree with the preview's fadeEnvelope and with
+ * ffmpeg's chained afade filters. All three MULTIPLY the two fades; scheduling
+ * them as separate Web Audio ramp events does not, which is what this covers.
+ */
+const audioAsset: Asset = {
+  id: 'a1',
+  kind: 'video',
+  name: 'clip.mp4',
+  hash: 'h1',
+  duration: 30,
+  width: 1920,
+  height: 1080,
+  fps: 30,
+  hasAudio: true,
+  mimeType: 'video/mp4',
+}
+
+function clipWith(duration: number, fadeIn: number, fadeOut: number): VideoClip {
+  const clip = clipFromAsset(audioAsset, 0) as VideoClip
+  clip.duration = duration
+  clip.fadeIn = fadeIn
+  clip.fadeOut = fadeOut
+  return clip
+}
+
+describe('fadeCurve', () => {
+  it('matches fadeEnvelope at every sample', () => {
+    const clip = clipWith(4, 1, 1.5)
+    const curve = fadeCurve(clip, 0.8)
+    for (let i = 0; i < curve.length; i++) {
+      const local = (i / (curve.length - 1)) * clip.duration
+      expect(curve[i]).toBeCloseTo(0.8 * fadeEnvelope(clip, local), 5)
+    }
+  })
+
+  it('multiplies overlapping fades rather than jumping to full volume', () => {
+    // reachable from the inspector: any clip under 1s can have 0.5s of each
+    const clip = clipWith(0.6, 0.5, 0.5)
+    const curve = fadeCurve(clip, 1)
+    // the product peaks at 0.36 at the midpoint; scheduling the fades as
+    // independent ramp events gave a hard step to 1.0 instead
+    expect(Math.max(...curve)).toBeLessThan(0.4)
+    expect(Math.max(...curve)).toBeCloseTo(0.36, 2)
+  })
+
+  it('has no discontinuity between adjacent samples', () => {
+    const clip = clipWith(0.6, 0.5, 0.5)
+    const curve = fadeCurve(clip, 1)
+    for (let i = 1; i < curve.length; i++) {
+      expect(Math.abs(curve[i] - curve[i - 1])).toBeLessThan(0.05)
+    }
+  })
+
+  it('starts and ends at silence when both fades are set', () => {
+    const curve = fadeCurve(clipWith(4, 1, 1), 1)
+    expect(curve[0]).toBeCloseTo(0, 5)
+    expect(curve[curve.length - 1]).toBeCloseTo(0, 5)
+  })
+
+  it('scales by clip volume', () => {
+    const curve = fadeCurve(clipWith(4, 0, 0), 0.25)
+    expect(Math.max(...curve)).toBeCloseTo(0.25, 5)
   })
 })

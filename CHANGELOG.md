@@ -20,6 +20,31 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The layer stack that describes a frame moved out of `PlaybackController` into
   `web/src/engine/frameGraph.ts`. The live preview and the in-browser exporter now
   call the same builder, so a local export cannot drift from the preview.
+- Downscaled local exports now ask the browser for its highest-quality resampling
+  filter instead of the default, which aliased visibly at 0.5x.
+
+### Fixed
+
+- **Rotated sources exported sideways.** A clip carrying a display matrix (any phone
+  portrait recording) was handed to the compositor as its raw decoded landscape frame
+  while the layer was sized from the post-rotation dimensions, so it exported on its
+  side and stretched. Frames are now drawn through the sample's own rotation, matching
+  the preview exactly.
+- **Overlapping fades jumped to full volume.** The two fades multiply in the preview
+  and in ffmpeg, but the local export scheduled them as independent Web Audio ramp
+  events, so any clip shorter than the sum of its fades produced a click at roughly
+  full volume with its fade-in lost. The gain is now sampled from the same envelope
+  the preview uses.
+- **Undecodable or missing media exported silently black.** Every source is opened up
+  front and the export stops with the asset's name, distinguishing media missing from
+  browser storage (re-import it) from media this browser cannot decode (use the render
+  service). Unencodable audio no longer disappears from the output either.
+- Two clips of the same asset on screen together (split, then crossfaded) could show
+  one recycled frame for both.
+- Still images re-uploaded their full-resolution texture to the GPU on every preview
+  frame, a regression from the `frameGraph` extraction.
+- The exporter leaked its demuxers, hardware decoders and WebGL context on cancel or
+  failure, and the finished download URL leaked if the dialog closed mid-export.
 
 ### Known issues
 

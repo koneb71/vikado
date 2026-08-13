@@ -131,10 +131,18 @@ export function ExportDialog({
       handle.result
         .then((blob) => {
           const url = URL.createObjectURL(blob)
+          // cancel and close both clear handleRef; an export that resolves
+          // after either would otherwise leak this URL and resurrect the
+          // finished state in a dialog the user already dismissed
+          if (handleRef.current !== handle) {
+            URL.revokeObjectURL(url)
+            return
+          }
           objectUrlRef.current = url
           setDownloadUrl(url)
         })
         .catch((e: Error) => {
+          if (handleRef.current !== handle) return
           if (e.message !== 'canceled') setError(e.message)
         })
       return

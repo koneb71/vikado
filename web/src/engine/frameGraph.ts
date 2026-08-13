@@ -104,7 +104,9 @@ function layerFor(
       width: size.w * (crop?.w ?? 1),
       height: size.h * (crop?.h ?? 1),
       key: clip.assetId,
-      dynamic: true,
+      // only moving sources need a re-upload per frame; a still image would
+      // otherwise push its full-resolution texture to the GPU every frame
+      dynamic: clip.type === 'video',
       transform,
       adjustments: clip.adjustments,
       filter: clip.filter,
