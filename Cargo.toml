@@ -15,7 +15,7 @@ categories = ["multimedia::video", "multimedia::encoding", "web-programming::htt
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-ts-rs = { version = "10", features = ["serde-compat"] }
+ts-rs = { version = "12", features = ["serde-compat"] }
 thiserror = "2"
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }
