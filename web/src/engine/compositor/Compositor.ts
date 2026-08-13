@@ -1,4 +1,5 @@
 import { LAYER_FRAG_SRC, VERTEX_SRC } from '@/engine/compositor/shaders'
+import { layerMatrix } from '@/engine/compositor/geometry'
 import { filterMatrix } from '@/schema/filters'
 import type { ColorAdjustments, FilterPreset, Transform } from '@/schema/project'
 
@@ -190,39 +191,6 @@ export class Compositor {
     }
   }
 
-  /**
-   * quad (unit, centered) -> clip space matrix.
-   * Media is "contain"-fitted to the stage at scale 1, then scaled/rotated and
-   * offset by (x, y) canvas px (y down). Column-major mat3.
-   */
-  private layerMatrix(layer: DrawLayer): Float32Array {
-    const { stageWidth: SW, stageHeight: SH } = this
-    const fit =
-      layer.fitMode === 'none'
-        ? 1
-        : layer.fitMode === 'cover'
-          ? Math.max(SW / layer.width, SH / layer.height)
-          : Math.min(SW / layer.width, SH / layer.height)
-    const w = layer.width * fit * layer.transform.scale * (layer.flipH ? -1 : 1)
-    const h = layer.height * fit * layer.transform.scale * (layer.flipV ? -1 : 1)
-
-    const rad = (layer.transform.rotation * Math.PI) / 180
-    const cos = Math.cos(rad)
-    const sin = Math.sin(rad)
-
-    // scale to px, rotate, then convert px -> clip (x/ (SW/2), -y/(SH/2))
-    const sx = 2 / SW
-    const sy = 2 / SH
-    const tx = (layer.transform.x + (layer.offsetX ?? 0)) * sx
-    const ty = -layer.transform.y * sy
-
-    // column-major mat3
-    return new Float32Array([
-      (w * cos) * sx, (w * sin) * -sy, 0,
-      (h * -sin) * sx, (h * cos) * -sy, 0,
-      tx, ty, 1,
-    ])
-  }
 
   /** Composite the given layers bottom-up onto the stage. */
   draw(layers: DrawLayer[]): void {
@@ -245,7 +213,11 @@ export class Compositor {
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.uniform1i(this.uniforms.tex, 0)
-      gl.uniformMatrix3fv(this.uniforms.transform, false, this.layerMatrix(layer))
+      gl.uniformMatrix3fv(
+        this.uniforms.transform,
+        false,
+        layerMatrix(layer, this.stageWidth, this.stageHeight),
+      )
       gl.uniform1i(this.uniforms.flipY, 1)
       gl.uniform1f(this.uniforms.opacity, layer.opacity)
       gl.uniform1f(this.uniforms.brightness, layer.adjustments.brightness)

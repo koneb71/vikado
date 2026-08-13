@@ -25,6 +25,16 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- **Every layer was composited upside down.** The vertex shader flips v so the
+  quad's top edge samples the texture's top row, but `layerMatrix` then negated
+  the y basis as well as the translation, so that edge landed at the bottom of
+  the frame. Video, images, text and subtitles were all mirrored vertically in
+  the preview and in the local export, against an ffmpeg renderer that was
+  upright the whole time. Only the translation is negated now, and the
+  placement maths moved to `web/src/engine/compositor/geometry.ts` with tests
+  pinned to corner colours read off real renderer output — orientation is the
+  one thing a preview-vs-local-export comparison can never catch, since both
+  share that code and a shared flip cancels out.
 - **Rotated sources exported sideways.** A clip carrying a display matrix (any phone
   portrait recording) was handed to the compositor as its raw decoded landscape frame
   while the layer was sized from the post-rotation dimensions, so it exported on its
