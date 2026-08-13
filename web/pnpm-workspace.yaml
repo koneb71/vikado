@@ -4,3 +4,15 @@ allowBuilds:
   onnxruntime-node: false
   protobufjs: false
   sharp: false
+# Same deps carry advisories (adm-zip 4GB alloc, sharp/libvips CVEs). Neither is
+# reachable from the browser bundle, but pin the patched versions anyway.
+overrides:
+  adm-zip: ^0.6.0
+  sharp: ^0.35.0
+  # global-agent 3 drags in the deprecated boolean@3.2.0 (deprecated at every
+  # version, so it can't be bumped directly) plus roarr 2; v4 drops both. Only
+  # used by onnxruntime-node's postinstall, which allowBuilds disables above.
+  global-agent: ^4.1.3
+minimumReleaseAgeExclude:
+  - adm-zip@0.6.0
+  - sharp@0.35.0
