@@ -88,5 +88,7 @@ export function newTextClip(start: number, text = 'Your text here'): TextClip {
     measuredHeight: 0,
     fadeIn: 0,
     fadeOut: 0,
+    animationIn: null,
+    animationOut: null,
   }
 }

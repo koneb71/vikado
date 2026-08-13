@@ -4,6 +4,7 @@ import type { ColorAdjustments } from "./ColorAdjustments";
 import type { Crop } from "./Crop";
 import type { FilterPreset } from "./FilterPreset";
 import type { Keyframes } from "./Keyframes";
+import type { TextAnimation } from "./TextAnimation";
 import type { TextStyle } from "./TextStyle";
 import type { Transform } from "./Transform";
 import type { Transition } from "./Transition";
@@ -25,4 +26,4 @@ text: string, style: TextStyle, transform: Transform, keyframes: Keyframes,
  * rendered block size in canvas px, measured by the editor whenever
  * text/style change; 0 = unknown (renderer falls back to centered)
  */
-measuredWidth: number, measuredHeight: number, fadeIn: number, fadeOut: number, };
+measuredWidth: number, measuredHeight: number, fadeIn: number, fadeOut: number, animationIn: TextAnimation | null, animationOut: TextAnimation | null, };

@@ -55,6 +55,12 @@ pub enum FilterPreset {
     Cool,
     Warm,
     Invert,
+    Noir,
+    Vivid,
+    Faded,
+    Cyberpunk,
+    Sunset,
+    Mint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -63,10 +69,39 @@ pub enum FilterPreset {
 pub enum TransitionType {
     Crossfade,
     FadeBlack,
+    FadeWhite,
     WipeLeft,
     WipeRight,
+    WipeUp,
+    WipeDown,
     SlideLeft,
     SlideRight,
+    SlideUp,
+    SlideDown,
+}
+
+/// Entrance/exit animation for a text clip. Movement and scale only — opacity
+/// is covered by fade_in/fade_out. Every variant is a LINEAR ramp, because ASS
+/// \move and \t interpolate linearly and the preview must not drift from them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "kebab-case")]
+#[ts(export)]
+pub enum TextAnimationType {
+    SlideUp,
+    SlideDown,
+    SlideLeft,
+    SlideRight,
+    ZoomIn,
+    ZoomOut,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TextAnimation {
+    #[serde(rename = "type")]
+    pub kind: TextAnimationType,
+    /// seconds
+    pub duration: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
@@ -170,6 +205,40 @@ pub enum TextAlign {
     Right,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum TextTransform {
+    #[default]
+    None,
+    Uppercase,
+    Lowercase,
+}
+
+impl TextTransform {
+    /// Casing applied before measuring or rasterising, matching
+    /// `applyTextTransform` in web/src/schema/project.ts.
+    pub fn apply(self, text: &str) -> String {
+        match self {
+            TextTransform::None => text.to_string(),
+            TextTransform::Uppercase => text.to_uppercase(),
+            TextTransform::Lowercase => text.to_lowercase(),
+        }
+    }
+}
+
+/// Drop shadow. ASS expresses this as a single \shad depth down-right plus
+/// BackColour, so there is one distance rather than separate x/y, and no blur.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TextShadow {
+    /// #rrggbb
+    pub color: String,
+    /// px, offset applied equally right and down
+    pub distance: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -187,6 +256,15 @@ pub struct TextStyle {
     pub outline_color: Option<String>,
     pub outline_width: f64,
     pub align: TextAlign,
+    /// px added between glyphs (ASS Spacing)
+    #[serde(default)]
+    pub letter_spacing: f64,
+    /// ASS reuses BackColour for the opaque box AND the shadow, so a style
+    /// with a background box cannot also carry a shadow — the box wins.
+    #[serde(default)]
+    pub shadow: Option<TextShadow>,
+    #[serde(default)]
+    pub text_transform: TextTransform,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -309,7 +387,116 @@ pub enum Clip {
         measured_height: f64,
         fade_in: f64,
         fade_out: f64,
+        #[serde(default)]
+        animation_in: Option<TextAnimation>,
+        #[serde(default)]
+        animation_out: Option<TextAnimation>,
     },
+}
+
+/// Offsets and scale an animation contributes at progress `q` (0 = fully away,
+/// 1 = at rest). Mirrors `contribution` in web/src/lib/textAnimation.ts.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TextAnimationState {
+    pub offset_x: f64,
+    pub offset_y: f64,
+    pub scale: f64,
+}
+
+impl TextAnimationState {
+    pub const NEUTRAL: Self = Self {
+        offset_x: 0.0,
+        offset_y: 0.0,
+        scale: 1.0,
+    };
+}
+
+impl TextAnimation {
+    fn contribution(
+        &self,
+        q: f64,
+        measured_width: f64,
+        measured_height: f64,
+        canvas_w: f64,
+        canvas_h: f64,
+    ) -> TextAnimationState {
+        let away = 1.0 - q;
+        let dist = |horizontal: bool| {
+            let measured = if horizontal {
+                measured_width
+            } else {
+                measured_height
+            };
+            if measured > 0.0 {
+                measured
+            } else {
+                (if horizontal { canvas_w } else { canvas_h }) * 0.1
+            }
+        };
+        let s = |offset_x: f64, offset_y: f64, scale: f64| TextAnimationState {
+            offset_x,
+            offset_y,
+            scale,
+        };
+        match self.kind {
+            TextAnimationType::SlideUp => s(0.0, away * dist(false), 1.0),
+            TextAnimationType::SlideDown => s(0.0, -away * dist(false), 1.0),
+            TextAnimationType::SlideLeft => s(away * dist(true), 0.0, 1.0),
+            TextAnimationType::SlideRight => s(-away * dist(true), 0.0, 1.0),
+            TextAnimationType::ZoomIn => s(0.0, 0.0, 0.6 + 0.4 * q),
+            TextAnimationType::ZoomOut => s(0.0, 0.0, 1.4 - 0.4 * q),
+        }
+    }
+}
+
+/// Combined animation state `local_time` seconds into a text clip. In and out
+/// compose: offsets add, scales multiply. Mirrors `textAnimationState` in
+/// web/src/lib/textAnimation.ts — keep both in step.
+#[allow(clippy::too_many_arguments)]
+pub fn text_animation_state(
+    animation_in: Option<&TextAnimation>,
+    animation_out: Option<&TextAnimation>,
+    duration: f64,
+    local_time: f64,
+    measured_width: f64,
+    measured_height: f64,
+    canvas_w: f64,
+    canvas_h: f64,
+) -> TextAnimationState {
+    let mut out = TextAnimationState::NEUTRAL;
+    let mut fold = |c: TextAnimationState| {
+        out.offset_x += c.offset_x;
+        out.offset_y += c.offset_y;
+        out.scale *= c.scale;
+    };
+    if let Some(a) = animation_in {
+        let q = (local_time / a.duration).clamp(0.0, 1.0);
+        fold(a.contribution(q, measured_width, measured_height, canvas_w, canvas_h));
+    }
+    if let Some(a) = animation_out {
+        let q = ((duration - local_time) / a.duration).clamp(0.0, 1.0);
+        fold(a.contribution(q, measured_width, measured_height, canvas_w, canvas_h));
+    }
+    out
+}
+
+/// Clip-local times where a text animation changes slope; each adjacent pair
+/// becomes one ASS event carrying a linear \move / \t across it.
+pub fn text_animation_segments(
+    animation_in: Option<&TextAnimation>,
+    animation_out: Option<&TextAnimation>,
+    duration: f64,
+) -> Vec<f64> {
+    let mut bounds = vec![0.0, duration];
+    if let Some(a) = animation_in {
+        bounds.push(a.duration.min(duration));
+    }
+    if let Some(a) = animation_out {
+        bounds.push((duration - a.duration).max(0.0));
+    }
+    bounds.sort_by(|a, b| a.total_cmp(b));
+    bounds.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    bounds
 }
 
 impl Clip {

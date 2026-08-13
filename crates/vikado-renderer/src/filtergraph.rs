@@ -396,48 +396,73 @@ pub fn emit_graph(
 
         // transition blending on the INCOMING side (B rides on top of A)
         if let Some(tr) = v.transition_in {
+            let d = f(tr.duration);
+            // geq passes rgb straight through and only drives alpha; the mask
+            // edge tracks the same (1-p)/p ramps frameGraph scissors with.
+            let rgb = "r='r(X\\,Y)':g='g(X\\,Y)':b='b(X\\,Y)'";
             match tr.kind {
-                TransitionType::Crossfade
-                | TransitionType::WipeLeft
-                | TransitionType::WipeRight => {
-                    // wipes: alpha mask sweeping across; crossfade: plain alpha ramp
-                    match tr.kind {
-                        TransitionType::Crossfade => chain.push(format!(
-                            "fade=t=in:st=0:d={}:alpha=1",
-                            f(tr.duration)
-                        )),
-                        TransitionType::WipeLeft => chain.push(format!(
-                            "geq=a='255*gte(X\\,W*(1-clip(T/{d}\\,0\\,1)))':r='r(X\\,Y)':g='g(X\\,Y)':b='b(X\\,Y)'",
-                            d = f(tr.duration)
-                        )),
-                        TransitionType::WipeRight => chain.push(format!(
-                            "geq=a='255*lte(X\\,W*clip(T/{d}\\,0\\,1))':r='r(X\\,Y)':g='g(X\\,Y)':b='b(X\\,Y)'",
-                            d = f(tr.duration)
-                        )),
-                        _ => unreachable!(),
-                    }
+                TransitionType::Crossfade => {
+                    chain.push(format!("fade=t=in:st=0:d={d}:alpha=1"));
+                }
+                TransitionType::WipeLeft => chain.push(format!(
+                    "geq=a='255*gte(X\\,W*(1-clip(T/{d}\\,0\\,1)))':{rgb}"
+                )),
+                TransitionType::WipeRight => {
+                    chain.push(format!("geq=a='255*lte(X\\,W*clip(T/{d}\\,0\\,1))':{rgb}"))
+                }
+                TransitionType::WipeUp => chain.push(format!(
+                    "geq=a='255*gte(Y\\,H*(1-clip(T/{d}\\,0\\,1)))':{rgb}"
+                )),
+                TransitionType::WipeDown => {
+                    chain.push(format!("geq=a='255*lte(Y\\,H*clip(T/{d}\\,0\\,1))':{rgb}"))
                 }
                 TransitionType::FadeBlack => {
                     // B appears in the second half of the window
                     chain.push(format!(
-                        "fade=t=in:st={}:d={}:alpha=1",
-                        f(tr.duration / 2.0),
-                        f(tr.duration / 2.0)
+                        "fade=t=in:st={h}:d={h}:alpha=1",
+                        h = f(tr.duration / 2.0)
                     ));
                 }
-                TransitionType::SlideLeft | TransitionType::SlideRight => {
+                TransitionType::FadeWhite => {
+                    // A goes white over the first half (below), B comes BACK
+                    // from white over the second half. B's alpha steps rather
+                    // than ramps: ramping both alpha and colour would compose
+                    // as q^2 over the already-white A, where the preview's
+                    // single white overlay gives q.
+                    chain.push(format!(
+                        "fade=t=in:st={h}:d={h}:color=white",
+                        h = f(tr.duration / 2.0)
+                    ));
+                    chain.push(format!(
+                        "geq=a='255*gte(T\\,{h})':{rgb}",
+                        h = f(tr.duration / 2.0)
+                    ));
+                }
+                TransitionType::SlideLeft
+                | TransitionType::SlideRight
+                | TransitionType::SlideUp
+                | TransitionType::SlideDown => {
                     // position animation handled at the overlay stage
                 }
             }
         }
         if let Some(tr) = v.transition_out_adj {
-            if tr.kind == TransitionType::FadeBlack {
+            match tr.kind {
                 // A disappears in the first half of the window
-                chain.push(format!(
+                TransitionType::FadeBlack => chain.push(format!(
                     "fade=t=out:st={}:d={}:alpha=1",
                     f(ext_in + dur),
                     f(tr.duration / 2.0)
-                ));
+                )),
+                // A stays opaque and washes to white instead, so the flash is
+                // white rather than whatever the canvas background happens to
+                // be. Matches the preview's white overlay at opacity 2p.
+                TransitionType::FadeWhite => chain.push(format!(
+                    "fade=t=out:st={}:d={}:color=white",
+                    f(ext_in + dur),
+                    f(tr.duration / 2.0)
+                )),
+                _ => {}
             }
         }
 
@@ -532,22 +557,28 @@ pub fn emit_graph(
             format!("({})", kf_expr(&keyframes.y, &overlay_t, |v| v))
         };
         let mut x = format!("(main_w-overlay_w)/2+{x_off}");
-        let y = format!("(main_h-overlay_h)/2+{y_off}");
+        let mut y = format!("(main_h-overlay_h)/2+{y_off}");
 
-        // slide transitions animate the incoming clip's x across the window
+        // slide transitions animate the incoming clip's position across the
+        // window: it starts one full stage away on the relevant axis and
+        // arrives at its resting place at p=1. Mirrors frameGraph's
+        // offsetX/offsetY, which use the same (1-p) ramp.
         if let Some(tr) = v.transition_in {
             let d = f(tr.duration);
             let t0 = f(win_start);
+            let ramp = format!("(1-clip((t-{t0})/{d}\\,0\\,1))");
             match tr.kind {
                 TransitionType::SlideLeft => {
-                    x = format!(
-                        "(main_w-overlay_w)/2+{x_off}+main_w*(1-clip((t-{t0})/{d}\\,0\\,1))"
-                    );
+                    x = format!("(main_w-overlay_w)/2+{x_off}+main_w*{ramp}");
                 }
                 TransitionType::SlideRight => {
-                    x = format!(
-                        "(main_w-overlay_w)/2+{x_off}-main_w*(1-clip((t-{t0})/{d}\\,0\\,1))"
-                    );
+                    x = format!("(main_w-overlay_w)/2+{x_off}-main_w*{ramp}");
+                }
+                TransitionType::SlideUp => {
+                    y = format!("(main_h-overlay_h)/2+{y_off}+main_h*{ramp}");
+                }
+                TransitionType::SlideDown => {
+                    y = format!("(main_h-overlay_h)/2+{y_off}-main_h*{ramp}");
                 }
                 _ => {}
             }
@@ -758,5 +789,42 @@ fn preset_chain(preset: FilterPreset) -> Vec<String> {
             "colorchannelmixer=1.08:0:0:0:0:1:0:0:0:0:.92:0".into(),
             "lutrgb=r='clip(val+8\\,0\\,255)':g='clip(val+5\\,0\\,255)'".into(),
         ],
+        // noir: grayscale then contrast 1.5 about mid grey.
+        //
+        // NOT colorchannelmixer + lutrgb like the presets below: the mixer
+        // clamps to [0,255] before lutrgb subtracts, so a highlight that the
+        // shader takes to 1.5*luma-0.25 = 255 would come back 255-64 = 191.
+        // `eq=contrast` is the same affine 1.5*(v-0.5)+0.5 with ONE clamp at
+        // the end, which is what the shader matrix does.
+        FilterPreset::Noir => vec!["hue=s=0".into(), "eq=contrast=1.5".into()],
+        // vivid: saturation x1.4 about the BT.601 luma axis
+        FilterPreset::Vivid => vec![
+            "colorchannelmixer=1.2804:-0.2348:-0.0456:0:-0.1196:1.1652:-0.0456:0:-0.1196:-0.2348:1.3544:0"
+                .into(),
+        ],
+        FilterPreset::Faded => vec![
+            "colorchannelmixer=0.7338:0.0722:0.014:0:0.0368:0.7692:0.014:0:0.0368:0.0722:0.711:0"
+                .into(),
+            "lutrgb=r='clip(val+26\\,0\\,255)':g='clip(val+26\\,0\\,255)':b='clip(val+31\\,0\\,255)'"
+                .into(),
+        ],
+        FilterPreset::Cyberpunk => vec![
+            "colorchannelmixer=1.15:0:-0.05:0:-0.05:0.95:0.1:0:0.1:0.05:1.2:0".into(),
+            "lutrgb=b='clip(val+13\\,0\\,255)'".into(),
+        ],
+        FilterPreset::Sunset => vec![
+            "colorchannelmixer=1.18:0.06:0:0:0.02:0.98:0.02:0:0:0.04:0.88:0".into(),
+            "lutrgb=r='clip(val+10\\,0\\,255)':b='clip(val+8\\,0\\,255)'".into(),
+        ],
+        FilterPreset::Mint => vec![
+            "colorchannelmixer=0.88:0.02:0:0:0:1.06:0.04:0:0:0.06:1.02:0".into(),
+            "lutrgb=g='clip(val+5\\,0\\,255)':b='clip(val+8\\,0\\,255)'".into(),
+        ],
     }
+}
+
+/// The colour chain for one preset, for the ffmpeg-vs-shader parity test in
+/// tests/golden_render.rs.
+pub fn preset_chain_for_test(preset: FilterPreset) -> Vec<String> {
+    preset_chain(preset)
 }

@@ -6,11 +6,25 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Bundled editor fonts — the same TTFs the render service uses for libass,
-   so exported text matches the preview pixel-for-pixel. */
+   so exported text matches the preview pixel-for-pixel. Keep this list in
+   sync with src/schema/fonts.ts (fonts.test.ts fails if it drifts).
+
+   The declared weight range must match what the FILE can actually do. A
+   single-weight face declared as a range would be used verbatim by the
+   browser at weight 700 while libass synthesises faux bold — so static faces
+   declare 400 only, and both sides synthesise alike. */
 @font-face { font-family: 'Inter'; src: url('/fonts/Inter.ttf'); font-weight: 100 900; }
 @font-face { font-family: 'Roboto'; src: url('/fonts/Roboto.ttf'); font-weight: 100 900; }
-@font-face { font-family: 'Oswald'; src: url('/fonts/Oswald.ttf'); font-weight: 200 700; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/Montserrat.ttf'); font-weight: 400; }
+@font-face { font-family: 'Poppins'; src: url('/fonts/Poppins.ttf'); font-weight: 400; }
 @font-face { font-family: 'Playfair Display'; src: url('/fonts/PlayfairDisplay.ttf'); font-weight: 400 900; }
+@font-face { font-family: 'Merriweather'; src: url('/fonts/Merriweather.ttf'); font-weight: 400; }
+@font-face { font-family: 'Oswald'; src: url('/fonts/Oswald.ttf'); font-weight: 200 700; }
+@font-face { font-family: 'Bebas Neue'; src: url('/fonts/BebasNeue.ttf'); font-weight: 400; }
+@font-face { font-family: 'Anton'; src: url('/fonts/Anton.ttf'); font-weight: 400; }
+@font-face { font-family: 'Bangers'; src: url('/fonts/Bangers.ttf'); font-weight: 400; }
+@font-face { font-family: 'Lobster'; src: url('/fonts/Lobster.ttf'); font-weight: 400; }
+@font-face { font-family: 'Caveat'; src: url('/fonts/Caveat.ttf'); font-weight: 400 700; }
 @font-face { font-family: 'JetBrains Mono'; src: url('/fonts/JetBrainsMono.ttf'); font-weight: 100 800; }
 
 @theme inline {

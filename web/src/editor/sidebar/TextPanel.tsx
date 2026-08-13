@@ -43,6 +43,54 @@ const TEXT_PRESETS: { name: string; text: string; style: Partial<TextStyle>; swa
     style: { fontFamily: 'JetBrains Mono', fontSize: 64, fontWeight: 400, color: '#a5f3fc', backgroundColor: '#0e2a30', outlineColor: null, outlineWidth: 0 },
     swatchClass: 'rounded bg-cyan-950 px-1.5 font-mono text-cyan-200',
   },
+  {
+    name: 'Impact',
+    text: 'IMPACT',
+    style: { fontFamily: 'Anton', fontSize: 104, fontWeight: 400, color: '#ffffff', outlineColor: '#000000', outlineWidth: 5, textTransform: 'uppercase', letterSpacing: 2 },
+    swatchClass: 'tracking-wide text-white',
+  },
+  {
+    name: 'Headline',
+    text: 'HEADLINE',
+    style: { fontFamily: 'Bebas Neue', fontSize: 112, fontWeight: 400, color: '#ffffff', outlineColor: null, outlineWidth: 0, textTransform: 'uppercase', letterSpacing: 6, shadow: { color: '#000000', distance: 6 } },
+    swatchClass: 'tracking-[0.2em] text-white',
+  },
+  {
+    name: 'Comic',
+    text: 'Boom!',
+    style: { fontFamily: 'Bangers', fontSize: 108, fontWeight: 400, color: '#ffd23f', outlineColor: '#1b1b1b', outlineWidth: 5, letterSpacing: 2 },
+    swatchClass: 'text-amber-300',
+  },
+  {
+    name: 'Script',
+    text: 'Lovely',
+    style: { fontFamily: 'Lobster', fontSize: 96, fontWeight: 400, color: '#ffe4ef', outlineColor: null, outlineWidth: 0, shadow: { color: '#7a2348', distance: 5 } },
+    swatchClass: 'text-pink-100',
+  },
+  {
+    name: 'Handwritten',
+    text: 'note to self',
+    style: { fontFamily: 'Caveat', fontSize: 92, fontWeight: 400, color: '#fefce8', outlineColor: null, outlineWidth: 0, shadow: { color: '#1c1917', distance: 3 } },
+    swatchClass: 'text-yellow-50',
+  },
+  {
+    name: 'Editorial',
+    text: 'Editorial',
+    style: { fontFamily: 'Merriweather', fontSize: 76, fontWeight: 400, color: '#faf7f2', outlineColor: null, outlineWidth: 0, letterSpacing: 1, shadow: { color: '#000000', distance: 3 } },
+    swatchClass: 'font-serif text-stone-50',
+  },
+  {
+    name: 'Minimal',
+    text: 'minimal',
+    style: { fontFamily: 'Montserrat', fontSize: 72, fontWeight: 400, color: '#ffffff', outlineColor: null, outlineWidth: 0, textTransform: 'lowercase', letterSpacing: 10 },
+    swatchClass: 'tracking-[0.3em] text-white',
+  },
+  {
+    name: 'Soft',
+    text: 'Soft',
+    style: { fontFamily: 'Poppins', fontSize: 84, fontWeight: 400, color: '#1f2937', backgroundColor: '#f9fafb', outlineColor: null, outlineWidth: 0 },
+    swatchClass: 'rounded bg-gray-50 px-1.5 text-gray-800',
+  },
 ]
 
 function insertTextClip(mutateClip: (clip: ReturnType<typeof newTextClip>) => void) {

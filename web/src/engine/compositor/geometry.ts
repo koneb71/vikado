@@ -29,6 +29,7 @@ export interface LayerGeometry {
   flipV?: boolean
   /** extra stage-px translation applied after transform (slide transitions) */
   offsetX?: number
+  offsetY?: number
 }
 
 /**
@@ -56,7 +57,7 @@ export function layerMatrix(layer: LayerGeometry, stageWidth: number, stageHeigh
   const sy = 2 / SH
   const tx = (layer.transform.x + (layer.offsetX ?? 0)) * sx
   // canvas y grows downward, clip space upward, so only the OFFSET is negated
-  const ty = -layer.transform.y * sy
+  const ty = -(layer.transform.y + (layer.offsetY ?? 0)) * sy
 
   return new Float32Array([
     (w * cos) * sx, (w * sin) * -sy, 0,

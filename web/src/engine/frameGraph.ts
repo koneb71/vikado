@@ -2,6 +2,7 @@ import type { DrawLayer, TexSource } from '@/engine/compositor/Compositor'
 import { renderText, textCacheKey } from '@/engine/TextRenderer'
 import { activeCueAt, visualLayersAt } from '@/engine/activeClips'
 import { sampleTransform } from '@/lib/keyframes'
+import { textAnimationState } from '@/lib/textAnimation'
 import {
   DEFAULT_ADJUSTMENTS,
   DEFAULT_TRANSFORM,
@@ -125,7 +126,16 @@ function layerFor(
   }
   if (clip.type === 'text') {
     const rendered = renderText(clip.text, clip.style)
-    const transform = sampleTransform(clip, localTime)
+    const base = sampleTransform(clip, localTime)
+    // entrance/exit animations ride on top of the (possibly keyframed)
+    // transform; ass.rs samples the same function at segment boundaries
+    const anim = textAnimationState(clip, localTime, project.width, project.height)
+    const transform = {
+      ...base,
+      x: base.x + anim.offsetX,
+      y: base.y + anim.offsetY,
+      scale: base.scale * anim.scale,
+    }
     return {
       source: rendered.canvas,
       width: rendered.width,
@@ -257,6 +267,40 @@ function backdropLayer(
  * The ffmpeg output is the reference; these are visually equivalent for
  * full-stage clips (the common case).
  */
+/**
+ * A 1x1 white texture, cover-fitted to the stage — the flash in a fade-white.
+ * One pixel is enough: the compositor samples it with CLAMP_TO_EDGE, and the
+ * texture is cached under a constant key so it uploads once per session.
+ */
+let whitePixel: HTMLCanvasElement | OffscreenCanvas | null = null
+
+function whiteLayer(width: number, height: number, opacity: number): DrawLayer {
+  if (!whitePixel) {
+    const canvas =
+      typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(1, 1)
+        : document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, 1, 1)
+    whitePixel = canvas
+  }
+  return {
+    source: whitePixel as TexSource,
+    width,
+    height,
+    key: 'transition:white',
+    dynamic: false,
+    fitMode: 'cover',
+    transform: DEFAULT_TRANSFORM,
+    adjustments: DEFAULT_ADJUSTMENTS,
+    filter: null,
+    opacity: Math.min(1, Math.max(0, opacity)),
+  }
+}
+
 function pushTransitionLayers(
   layers: DrawLayer[],
   project: Project,
@@ -282,6 +326,16 @@ function pushTransitionLayers(
         layers.push({ ...b, opacity: b.opacity * ((p - 0.5) * 2) })
       }
       break
+    case 'fade-white': {
+      // Both sides stay OPAQUE and a white sheet rides over them, peaking at
+      // the cut — fading their alpha instead would flash the canvas
+      // background, which is what fade-black deliberately does.
+      // The renderer's `fade=...:color=white` lerps the same way.
+      const side = p < 0.5 ? a : b
+      if (side) layers.push(side)
+      layers.push(whiteLayer(W, H, p < 0.5 ? p * 2 : (1 - p) * 2))
+      break
+    }
     case 'wipe-left': // reveal B from the right edge moving left
       if (a) layers.push(a)
       if (b) layers.push({ ...b, scissor: [W * (1 - p), 0, W * p, H] })
@@ -290,6 +344,14 @@ function pushTransitionLayers(
       if (a) layers.push(a)
       if (b) layers.push({ ...b, scissor: [0, 0, W * p, H] })
       break
+    case 'wipe-up': // reveal B from the bottom edge moving up
+      if (a) layers.push(a)
+      if (b) layers.push({ ...b, scissor: [0, H * (1 - p), W, H * p] })
+      break
+    case 'wipe-down':
+      if (a) layers.push(a)
+      if (b) layers.push({ ...b, scissor: [0, 0, W, H * p] })
+      break
     case 'slide-left': // B slides in from the right
       if (a) layers.push(a)
       if (b) layers.push({ ...b, offsetX: W * (1 - p) })
@@ -297,6 +359,14 @@ function pushTransitionLayers(
     case 'slide-right':
       if (a) layers.push(a)
       if (b) layers.push({ ...b, offsetX: -W * (1 - p) })
+      break
+    case 'slide-up': // B slides in from the bottom (canvas y grows downward)
+      if (a) layers.push(a)
+      if (b) layers.push({ ...b, offsetY: H * (1 - p) })
+      break
+    case 'slide-down':
+      if (a) layers.push(a)
+      if (b) layers.push({ ...b, offsetY: -H * (1 - p) })
       break
   }
 }

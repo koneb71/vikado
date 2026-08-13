@@ -1,0 +1,23 @@
+---
+source: crates/vikado-renderer/tests/graph_snapshots.rs
+assertion_line: 579
+expression: "vikado_renderer::ass::emit_ass(&p).content"
+---
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: T0,Bebas Neue,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,8,0,1,2,0,5,0,0,0,1
+Style: T1,Bebas Neue,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H005500FF,-1,0,0,0,100,100,0,0,1,2,6,5,0,0,0,1
+Style: T2,Bebas Neue,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00101010,-1,0,0,0,100,100,2,0,3,2,0,5,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 1,0:00:00.00,0:00:02.00,T0,,0,0,0,,{\pos(960,540)}SHADOWED TEXT
+Dialogue: 1,0:00:02.00,0:00:04.00,T1,,0,0,0,,{\pos(960,540)}shadowed text
+Dialogue: 1,0:00:04.00,0:00:06.00,T2,,0,0,0,,{\pos(960,540)}Shadowed Text

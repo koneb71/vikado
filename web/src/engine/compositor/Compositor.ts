@@ -41,6 +41,7 @@ export interface DrawLayer {
   chromaKey?: { rgb: [number, number, number]; similarity: number; blend: number }
   /** extra stage-px translation applied after transform (slide transitions) */
   offsetX?: number
+  offsetY?: number
   /** stage-px scissor rect [x, y, w, h] (y from top) — wipe transitions */
   scissor?: [number, number, number, number]
 }

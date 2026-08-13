@@ -31,17 +31,35 @@ export const zColorAdjustments = z.object({
 })
 export type ColorAdjustments = z.infer<typeof zColorAdjustments>
 
-export const FILTER_PRESETS = ['grayscale', 'sepia', 'vintage', 'cool', 'warm', 'invert'] as const
+export const FILTER_PRESETS = [
+  'grayscale',
+  'sepia',
+  'vintage',
+  'cool',
+  'warm',
+  'invert',
+  'noir',
+  'vivid',
+  'faded',
+  'cyberpunk',
+  'sunset',
+  'mint',
+] as const
 export const zFilterPreset = z.enum(FILTER_PRESETS)
 export type FilterPreset = z.infer<typeof zFilterPreset>
 
 export const TRANSITION_TYPES = [
   'crossfade',
   'fade-black',
+  'fade-white',
   'wipe-left',
   'wipe-right',
+  'wipe-up',
+  'wipe-down',
   'slide-left',
   'slide-right',
+  'slide-up',
+  'slide-down',
 ] as const
 export const zTransition = z.object({
   type: z.enum(TRANSITION_TYPES),
@@ -110,6 +128,22 @@ export const zCrop = z.object({
 })
 export type Crop = z.infer<typeof zCrop>
 
+export const TEXT_TRANSFORMS = ['none', 'uppercase', 'lowercase'] as const
+export const zTextTransform = z.enum(TEXT_TRANSFORMS)
+export type TextTransform = z.infer<typeof zTextTransform>
+
+/**
+ * Drop shadow. ASS expresses this as a single \shad DEPTH offset down-right
+ * plus BackColour, so there is one distance rather than separate x/y, and no
+ * blur — anything richer could not be mirrored by libass.
+ */
+export const zTextShadow = z.object({
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  /** px, offset applied equally right and down */
+  distance: z.number().min(0),
+})
+export type TextShadow = z.infer<typeof zTextShadow>
+
 export const zTextStyle = z.object({
   fontFamily: z.string(), // must be one of the bundled fonts (see fonts/)
   fontSize: z.number().positive(), // px at canvas resolution
@@ -120,8 +154,24 @@ export const zTextStyle = z.object({
   outlineColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
   outlineWidth: z.number().min(0),
   align: z.enum(['left', 'center', 'right']),
+  /** px added between glyphs (ASS Spacing) */
+  letterSpacing: z.number().default(0),
+  /**
+   * ASS reuses BackColour for BOTH the opaque box and the shadow, so a style
+   * with a background box cannot also carry a shadow. The box wins on both
+   * sides; see TextRenderer and ass.rs.
+   */
+  shadow: zTextShadow.nullable().default(null),
+  textTransform: zTextTransform.default('none'),
 })
 export type TextStyle = z.infer<typeof zTextStyle>
+
+/** Casing applied before measuring or rasterising. Shared by both renderers. */
+export function applyTextTransform(text: string, transform: TextTransform): string {
+  if (transform === 'uppercase') return text.toUpperCase()
+  if (transform === 'lowercase') return text.toLowerCase()
+  return text
+}
 
 export const zAsset = z.object({
   id: z.string(),
@@ -199,6 +249,33 @@ export const zAudioClip = zClipBase.extend({
 })
 export type AudioClip = z.infer<typeof zAudioClip>
 
+/**
+ * Entrance/exit animations for text.
+ *
+ * Movement and scale only — opacity is already covered by fadeIn/fadeOut, and
+ * having two ways to animate alpha would fight in the ASS emitter, which
+ * expresses one as \fad and the other as \t(\alpha).
+ *
+ * Every one of these is a LINEAR ramp on both sides: ASS \move and \t
+ * interpolate linearly, so the preview must not ease or the two would drift.
+ */
+export const TEXT_ANIMATIONS = [
+  'slide-up',
+  'slide-down',
+  'slide-left',
+  'slide-right',
+  'zoom-in',
+  'zoom-out',
+] as const
+export const zTextAnimationType = z.enum(TEXT_ANIMATIONS)
+export type TextAnimationType = z.infer<typeof zTextAnimationType>
+
+export const zTextAnimation = z.object({
+  type: zTextAnimationType,
+  duration: z.number().positive(), // seconds
+})
+export type TextAnimation = z.infer<typeof zTextAnimation>
+
 export const zTextClip = zClipBase.extend({
   type: z.literal('text'),
   text: z.string(), // may contain explicit \n line breaks (preview decides wrapping)
@@ -212,6 +289,8 @@ export const zTextClip = zClipBase.extend({
   measuredHeight: z.number().default(0),
   fadeIn: z.number().min(0),
   fadeOut: z.number().min(0),
+  animationIn: zTextAnimation.nullable().default(null),
+  animationOut: zTextAnimation.nullable().default(null),
 })
 export type TextClip = z.infer<typeof zTextClip>
 
@@ -281,6 +360,9 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
   outlineColor: '#000000',
   outlineWidth: 2,
   align: 'center',
+  letterSpacing: 0,
+  shadow: null,
+  textTransform: 'none',
 }
 
 export const DEFAULT_SUBTITLE_STYLE: TextStyle = {

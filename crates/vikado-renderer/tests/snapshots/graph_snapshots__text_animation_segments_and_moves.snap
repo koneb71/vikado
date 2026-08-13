@@ -1,0 +1,28 @@
+---
+source: crates/vikado-renderer/tests/graph_snapshots.rs
+assertion_line: 642
+expression: "vikado_renderer::ass::emit_ass(&p).content"
+---
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: T0,Anton,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,5,0,0,0,1
+Style: T1,Anton,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,5,0,0,0,1
+Style: T2,Anton,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,0,5,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 1,0:00:00.00,0:00:00.50,T0,,0,0,0,,{\move(960,630,960,540)\fscx100\fscy100}Animated
+Dialogue: 1,0:00:00.50,0:00:04.00,T0,,0,0,0,,{\pos(960,540)\fscx100\fscy100}Animated
+Dialogue: 1,0:00:04.00,0:00:04.30,T1,,0,0,0,,{\pos(960,540)\fscx60\fscy60\t(\fscx80\fscy80)\alpha&HFF&\t(\alpha&H00&)}Animated
+Dialogue: 1,0:00:04.30,0:00:04.60,T1,,0,0,0,,{\pos(960,540)\fscx80\fscy80\t(\fscx100\fscy100)}Animated
+Dialogue: 1,0:00:04.60,0:00:07.20,T1,,0,0,0,,{\pos(960,540)\fscx100\fscy100}Animated
+Dialogue: 1,0:00:07.20,0:00:08.00,T1,,0,0,0,,{\move(960,540,1360,540)\fscx100\fscy100}Animated
+Dialogue: 1,0:00:08.00,0:00:11.50,T2,,0,0,0,,{\pos(960,540)\fscx100\fscy100}Animated
+Dialogue: 1,0:00:11.50,0:00:12.00,T2,,0,0,0,,{\pos(960,540)\fscx100\fscy100\t(\fscx140\fscy140)}Animated

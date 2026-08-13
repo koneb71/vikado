@@ -44,19 +44,24 @@ fn style_line(name: &str, style: &TextStyle, alignment: u8, project: &Project) -
         .as_deref()
         .map(|c| ass_color(c, 0))
         .unwrap_or_else(|| "&H00000000".into());
-    // BorderStyle 3 = opaque box (background); 1 = outline + shadow
-    let (border_style, back_color) = match &style.background_color {
-        Some(bg) => (3, ass_color(bg, 0)),
-        None => (1, "&H00000000".to_string()),
+    // BorderStyle 3 = opaque box (background); 1 = outline + shadow.
+    // BackColour serves BOTH, so a background box and a drop shadow are
+    // mutually exclusive and the box wins — TextRenderer drops the shadow the
+    // same way, so the preview agrees.
+    let (border_style, back_color, shadow_depth) = match (&style.background_color, &style.shadow) {
+        (Some(bg), _) => (3, ass_color(bg, 0), 0.0),
+        (None, Some(sh)) => (1, ass_color(&sh.color, 0), sh.distance),
+        (None, None) => (1, "&H00000000".to_string(), 0.0),
     };
     let _ = project;
     format!(
-        "Style: {name},{font},{size},{primary},{primary},{outline_color},{back},{bold},{italic},0,0,100,100,0,0,{border_style},{outline},0,{alignment},0,0,0,1",
+        "Style: {name},{font},{size},{primary},{primary},{outline_color},{back},{bold},{italic},0,0,100,100,{spacing},0,{border_style},{outline},{shadow_depth},{alignment},0,0,0,1",
         font = style.font_family,
         size = style.font_size.round() as i64,
         primary = ass_color(&style.color, 0),
         back = back_color,
         outline = outline,
+        spacing = style.letter_spacing,
     )
 }
 
@@ -85,8 +90,11 @@ pub fn emit_ass(project: &Project) -> AssDoc {
                 style,
                 transform,
                 measured_width,
+                measured_height,
                 fade_in,
                 fade_out,
+                animation_in,
+                animation_out,
                 ..
             } = clip
             else {
@@ -111,36 +119,139 @@ pub fn emit_ass(project: &Project) -> AssDoc {
 
             // transform x/y are offsets from canvas center
             let py = h / 2.0 + transform.y;
-            let mut ovr = format!("\\pos({},{})", px.round(), py.round());
-            if transform.rotation != 0.0 {
-                // ASS \frz is counter-clockwise; our rotation is clockwise
-                let _ = write!(ovr, "\\frz{}", -transform.rotation.round());
-            }
-            if transform.scale != 1.0 {
-                let pct = (transform.scale * 100.0).round();
-                let _ = write!(ovr, "\\fscx{pct}\\fscy{pct}");
-            }
-            if transform.opacity < 1.0 {
-                let a = (255.0 * (1.0 - transform.opacity)).round() as u8;
-                let _ = write!(ovr, "\\alpha&H{a:02X}&");
-            }
-            if *fade_in > 0.0 || *fade_out > 0.0 {
-                let _ = write!(
-                    ovr,
-                    "\\fad({},{})",
-                    (*fade_in * 1000.0).round() as i64,
-                    (*fade_out * 1000.0).round() as i64
+            let body = escape_text(&style.text_transform.apply(text));
+
+            let rot = |ovr: &mut String| {
+                if transform.rotation != 0.0 {
+                    // ASS \frz is counter-clockwise; our rotation is clockwise
+                    let _ = write!(ovr, "\\frz{}", -transform.rotation.round());
+                }
+            };
+
+            if animation_in.is_none() && animation_out.is_none() {
+                let mut ovr = format!("\\pos({},{})", px.round(), py.round());
+                rot(&mut ovr);
+                if transform.scale != 1.0 {
+                    let pct = (transform.scale * 100.0).round();
+                    let _ = write!(ovr, "\\fscx{pct}\\fscy{pct}");
+                }
+                if transform.opacity < 1.0 {
+                    let a = (255.0 * (1.0 - transform.opacity)).round() as u8;
+                    let _ = write!(ovr, "\\alpha&H{a:02X}&");
+                }
+                if *fade_in > 0.0 || *fade_out > 0.0 {
+                    let _ = write!(
+                        ovr,
+                        "\\fad({},{})",
+                        (*fade_in * 1000.0).round() as i64,
+                        (*fade_out * 1000.0).round() as i64
+                    );
+                }
+                events.push((
+                    *start,
+                    format!(
+                        "Dialogue: 1,{},{},{name},,0,0,0,,{{{ovr}}}{body}",
+                        ass_time(*start),
+                        ass_time(start + duration),
+                    ),
+                ));
+            } else {
+                // An animated clip becomes one event per linear segment: \move
+                // carries position and \t carries scale across each, which is
+                // exact because textAnimation.ts ramps linearly between exactly
+                // these boundaries. \fad cannot survive the split (it would
+                // restart per event), so alpha is sampled and ramped too.
+                let mut bounds = vikado_types::text_animation_segments(
+                    animation_in.as_ref(),
+                    animation_out.as_ref(),
+                    *duration,
                 );
+                // the fade envelope changes slope at fade_in and at
+                // duration-fade_out; without those as boundaries a segment's
+                // alpha would ramp linearly across a corner and diverge from
+                // the preview, which evaluates the envelope continuously
+                if *fade_in > 0.0 {
+                    bounds.push(fade_in.min(*duration));
+                }
+                if *fade_out > 0.0 {
+                    bounds.push((*duration - *fade_out).max(0.0));
+                }
+                bounds.sort_by(|a, b| a.total_cmp(b));
+                bounds.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+                let state_at = |lt: f64| {
+                    vikado_types::text_animation_state(
+                        animation_in.as_ref(),
+                        animation_out.as_ref(),
+                        *duration,
+                        lt,
+                        *measured_width,
+                        *measured_height,
+                        w,
+                        h,
+                    )
+                };
+                // transform.opacity × the same fade envelope activeClips uses
+                let alpha_at = |lt: f64| {
+                    let mut o = transform.opacity;
+                    if *fade_in > 0.0 && lt < *fade_in {
+                        o *= lt / *fade_in;
+                    }
+                    let until_end = *duration - lt;
+                    if *fade_out > 0.0 && until_end < *fade_out {
+                        o *= (until_end / *fade_out).max(0.0);
+                    }
+                    o.clamp(0.0, 1.0)
+                };
+                let ass_alpha = |o: f64| (255.0 * (1.0 - o)).round() as u8;
+
+                for pair in bounds.windows(2) {
+                    let (s0, s1) = (pair[0], pair[1]);
+                    if s1 - s0 < 1e-6 {
+                        continue;
+                    }
+                    let a0 = state_at(s0);
+                    let a1 = state_at(s1);
+                    let (x0, y0) = (px + a0.offset_x, py + a0.offset_y);
+                    let (x1, y1) = (px + a1.offset_x, py + a1.offset_y);
+
+                    let mut ovr = if (x0 - x1).abs() < 1e-6 && (y0 - y1).abs() < 1e-6 {
+                        format!("\\pos({},{})", x0.round(), y0.round())
+                    } else {
+                        format!(
+                            "\\move({},{},{},{})",
+                            x0.round(),
+                            y0.round(),
+                            x1.round(),
+                            y1.round()
+                        )
+                    };
+                    rot(&mut ovr);
+
+                    let p0 = ((transform.scale * a0.scale) * 100.0).round();
+                    let p1 = ((transform.scale * a1.scale) * 100.0).round();
+                    let _ = write!(ovr, "\\fscx{p0}\\fscy{p0}");
+                    if (p0 - p1).abs() > f64::EPSILON {
+                        let _ = write!(ovr, "\\t(\\fscx{p1}\\fscy{p1})");
+                    }
+
+                    let (o0, o1) = (alpha_at(s0), alpha_at(s1));
+                    if o0 < 1.0 || o1 < 1.0 {
+                        let _ = write!(ovr, "\\alpha&H{:02X}&", ass_alpha(o0));
+                        if (o0 - o1).abs() > 1e-6 {
+                            let _ = write!(ovr, "\\t(\\alpha&H{:02X}&)", ass_alpha(o1));
+                        }
+                    }
+
+                    events.push((
+                        start + s0,
+                        format!(
+                            "Dialogue: 1,{},{},{name},,0,0,0,,{{{ovr}}}{body}",
+                            ass_time(start + s0),
+                            ass_time(start + s1),
+                        ),
+                    ));
+                }
             }
-            events.push((
-                *start,
-                format!(
-                    "Dialogue: 1,{},{},{name},,0,0,0,,{{{ovr}}}{}",
-                    ass_time(*start),
-                    ass_time(start + duration),
-                    escape_text(text)
-                ),
-            ));
         }
     }
 
@@ -158,7 +269,7 @@ pub fn emit_ass(project: &Project) -> AssDoc {
                     "Dialogue: 0,{},{},{name},,0,0,{margin_v},,{{\\an2}}{}",
                     ass_time(cue.start),
                     ass_time(cue.end),
-                    escape_text(&cue.text)
+                    escape_text(&subs.style.text_transform.apply(&cue.text))
                 ),
             ));
         }

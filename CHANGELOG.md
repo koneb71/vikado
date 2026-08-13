@@ -9,6 +9,17 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- **Eight more fonts**, taking the bundled set to thirteen across sans, serif, display,
+  script, handwriting and mono: Montserrat, Poppins, Merriweather, Bebas Neue, Anton,
+  Bangers, Lobster and Caveat. The font picker now groups by category.
+- **Six more filters** — noir, vivid, faded, cyberpunk, sunset and mint — each authored as
+  a colour matrix for the shader and mirrored as an ffmpeg chain.
+- **Five more transitions**: wipe up, wipe down, slide up, slide down, and fade through
+  white (as opposed to fade-black, which drops to the canvas colour).
+- **Text styling**: letter spacing, drop shadow, and an uppercase/lowercase transform.
+- **Text animations**: slide in or out from any of four directions, plus zoom in and zoom
+  out, independently on entry and exit.
+
 - **Export on this device.** The timeline can now be rendered and encoded entirely in
   the browser, using the GPU compositor for frames and the platform's hardware H.264
   encoder through WebCodecs, so an export no longer requires the render service. The
@@ -25,6 +36,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- **Roboto was not a font.** The bundled `Roboto.ttf` shipped in 0.1.0 as a saved HTML
+  page, so every project using it silently fell back to a different face — and to a
+  *different* fallback in the browser than in libass. Replaced with the real file, and
+  `fonts.test.ts` now checks that each bundled font is a real font whose internal family
+  name matches the one the ASS style line asks for.
 - **Every layer was composited upside down.** The vertex shader flips v so the
   quad's top edge samples the texture's top row, but `layerMatrix` then negated
   the y basis as well as the translation, so that edge landed at the bottom of

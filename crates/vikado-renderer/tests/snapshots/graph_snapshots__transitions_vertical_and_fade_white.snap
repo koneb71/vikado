@@ -1,0 +1,27 @@
+---
+source: crates/vikado-renderer/tests/graph_snapshots.rs
+assertion_line: 483
+expression: g.script
+---
+[0:v]trim=start=0:end=3.3,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,setpts=PTS+0/TB[c0];
+[1:v]trim=start=0:end=3.6,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,geq=a='255*gte(Y\,H*(1-clip(T/0.6\,0\,1)))':r='r(X\,Y)':g='g(X\,Y)':b='b(X\,Y)',setpts=PTS+2.7/TB[c1];
+[2:v]trim=start=0:end=3.6,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,geq=a='255*lte(Y\,H*clip(T/0.6\,0\,1))':r='r(X\,Y)':g='g(X\,Y)':b='b(X\,Y)',setpts=PTS+5.7/TB[c2];
+[3:v]trim=start=0:end=3.6,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,setpts=PTS+8.7/TB[c3];
+[4:v]trim=start=0:end=3.6,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,fade=t=out:st=3.3:d=0.3:color=white,setpts=PTS+11.7/TB[c4];
+[5:v]trim=start=0:end=2.3,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,fade=t=in:st=0.3:d=0.3:color=white,geq=a='255*gte(T\,0.3)':r='r(X\,Y)':g='g(X\,Y)':b='b(X\,Y)',setpts=PTS+14.7/TB[c5];
+color=c=0x000000:s=1920x1080:r=30:d=17[base0];
+[base0][c0]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,0,3.3)'[base1];
+[base1][c1]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,2.7,6.3)'[base2];
+[base2][c2]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,5.7,9.3)'[base3];
+[base3][c3]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0+main_h*(1-clip((t-8.7)/0.6\,0\,1))':eof_action=pass:enable='between(t,8.7,12.3)'[base4];
+[base4][c4]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0-main_h*(1-clip((t-11.7)/0.6\,0\,1))':eof_action=pass:enable='between(t,11.7,15.3)'[base5];
+[base5][c5]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,14.7,17)'[base6];
+[base6]null[vout];
+[0:a]atrim=start=0:end=3,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=0|0[a0];
+[1:a]atrim=start=0:end=3,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=3000|3000[a1];
+[2:a]atrim=start=0:end=3,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=6000|6000[a2];
+[3:a]atrim=start=0:end=3,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=9000|9000[a3];
+[4:a]atrim=start=0:end=3,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=12000|12000[a4];
+[5:a]atrim=start=0:end=2,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=15000|15000[a5];
+anullsrc=r=48000:cl=stereo:d=17[asilence];
+[asilence][a0][a1][a2][a3][a4][a5]amix=inputs=7:duration=first:normalize=0[aout]

@@ -317,6 +317,9 @@ fn ass_aligned_text() {
             outline_color: Some("#000000".into()),
             outline_width: 2.0,
             align,
+            letter_spacing: 0.0,
+            shadow: None,
+            text_transform: TextTransform::None,
         },
         transform: Transform {
             x: 120.0,
@@ -330,6 +333,8 @@ fn ass_aligned_text() {
         measured_height: 200.0,
         fade_in: 0.0,
         fade_out: 0.0,
+        animation_in: None,
+        animation_out: None,
     };
     let left = text_clip("t-left", TextAlign::Left, 640.0);
     let center = text_clip("t-center", TextAlign::Center, 640.0);
@@ -450,4 +455,202 @@ fn capcut_chroma_crop_bgblur() {
     assert!(g.script.contains("colorkey=color=0x00d000"));
     assert!(g.script.contains("crop=w='iw*0.8'"));
     insta::assert_snapshot!(g.script);
+}
+
+/// Every new transition emits a distinct mask/position rule. wipe-up/down mask
+/// on Y where left/right mask on X, slide-up/down animate the overlay's y where
+/// left/right animate x, and fade-white keeps both sides opaque and washes them
+/// through white (fade-black drops alpha to the canvas colour instead).
+#[test]
+fn transitions_vertical_and_fade_white() {
+    let kinds = [
+        TransitionType::WipeUp,
+        TransitionType::WipeDown,
+        TransitionType::SlideUp,
+        TransitionType::SlideDown,
+        TransitionType::FadeWhite,
+    ];
+    let mut clips = Vec::new();
+    for (i, kind) in kinds.iter().enumerate() {
+        let mut c = video_clip(&format!("c{i}"), "a1", i as f64 * 3.0, 3.0);
+        if let Clip::Video { transition_out, .. } = &mut c {
+            *transition_out = Some(Transition {
+                kind: *kind,
+                duration: 0.6,
+            });
+        }
+        clips.push(c);
+    }
+    clips.push(video_clip("cend", "a1", kinds.len() as f64 * 3.0, 2.0));
+    let p = project(
+        vec![track(TrackKind::Video, clips)],
+        vec![video_asset("a1")],
+    );
+    let g = emit_graph(&p, &fake_inputs(&p), None, None, &RenderOptions::default());
+    insta::assert_snapshot!(g.script);
+}
+
+/// The six added colour presets, each as its colorchannelmixer (+ lutrgb for
+/// the constant offsets) equivalent of the shader matrix in schema/filters.ts.
+#[test]
+fn added_filter_presets() {
+    let presets = [
+        FilterPreset::Noir,
+        FilterPreset::Vivid,
+        FilterPreset::Faded,
+        FilterPreset::Cyberpunk,
+        FilterPreset::Sunset,
+        FilterPreset::Mint,
+    ];
+    let mut clips = Vec::new();
+    for (i, preset) in presets.iter().enumerate() {
+        let mut c = video_clip(&format!("f{i}"), "a1", i as f64 * 2.0, 2.0);
+        if let Clip::Video { filter, .. } = &mut c {
+            *filter = Some(*preset);
+        }
+        clips.push(c);
+    }
+    let p = project(
+        vec![track(TrackKind::Video, clips)],
+        vec![video_asset("a1")],
+    );
+    let g = emit_graph(&p, &fake_inputs(&p), None, None, &RenderOptions::default());
+    insta::assert_snapshot!(g.script);
+}
+
+/// letterSpacing lands in the ASS Spacing column, textTransform is applied to
+/// the string itself, and a shadow becomes \shad depth + BackColour. A style
+/// with BOTH a background box and a shadow keeps the box: ASS has only one
+/// BackColour, and TextRenderer drops the shadow the same way.
+#[test]
+fn text_style_spacing_shadow_transform() {
+    let styled = |align: TextAlign,
+                  letter_spacing: f64,
+                  shadow: Option<TextShadow>,
+                  background_color: Option<String>,
+                  text_transform: TextTransform| TextStyle {
+        font_family: "Bebas Neue".into(),
+        font_size: 72.0,
+        font_weight: 700,
+        italic: false,
+        color: "#ffffff".into(),
+        background_color,
+        outline_color: Some("#000000".into()),
+        outline_width: 2.0,
+        align,
+        letter_spacing,
+        shadow,
+        text_transform,
+    };
+    let clip = |id: &str, start: f64, style: TextStyle| Clip::Text {
+        id: id.into(),
+        start,
+        duration: 2.0,
+        text: "Shadowed Text".into(),
+        style,
+        transform: transform(),
+        keyframes: Keyframes::default(),
+        measured_width: 400.0,
+        measured_height: 90.0,
+        fade_in: 0.0,
+        fade_out: 0.0,
+        animation_in: None,
+        animation_out: None,
+    };
+    let clips = vec![
+        clip(
+            "t1",
+            0.0,
+            styled(TextAlign::Center, 8.0, None, None, TextTransform::Uppercase),
+        ),
+        clip(
+            "t2",
+            2.0,
+            styled(
+                TextAlign::Center,
+                0.0,
+                Some(TextShadow {
+                    color: "#ff0055".into(),
+                    distance: 6.0,
+                }),
+                None,
+                TextTransform::Lowercase,
+            ),
+        ),
+        // shadow AND a box: the box must win, shadow depth back to 0
+        clip(
+            "t3",
+            4.0,
+            styled(
+                TextAlign::Center,
+                2.0,
+                Some(TextShadow {
+                    color: "#ff0055".into(),
+                    distance: 6.0,
+                }),
+                Some("#101010".into()),
+                TextTransform::None,
+            ),
+        ),
+    ];
+    let p = project(vec![track(TrackKind::Text, clips)], vec![]);
+    insta::assert_snapshot!(vikado_renderer::ass::emit_ass(&p).content);
+}
+
+/// An animated text clip splits into one event per linear segment: \move for
+/// position, \t(\fscx\fscy) for scale, and a sampled \alpha ramp in place of
+/// \fad (which would restart on every event). The boundaries and the values at
+/// them come from the same functions the preview uses.
+#[test]
+fn text_animation_segments_and_moves() {
+    let style = TextStyle {
+        font_family: "Anton".into(),
+        font_size: 72.0,
+        font_weight: 700,
+        italic: false,
+        color: "#ffffff".into(),
+        background_color: None,
+        outline_color: Some("#000000".into()),
+        outline_width: 2.0,
+        align: TextAlign::Center,
+        letter_spacing: 0.0,
+        shadow: None,
+        text_transform: TextTransform::None,
+    };
+    let animated = |id: &str,
+                    start: f64,
+                    animation_in: Option<TextAnimation>,
+                    animation_out: Option<TextAnimation>,
+                    fade_in: f64| Clip::Text {
+        id: id.into(),
+        start,
+        duration: 4.0,
+        text: "Animated".into(),
+        style: style.clone(),
+        transform: transform(),
+        keyframes: Keyframes::default(),
+        measured_width: 400.0,
+        measured_height: 90.0,
+        fade_in,
+        fade_out: 0.0,
+        animation_in,
+        animation_out,
+    };
+    let a = |kind: TextAnimationType, duration: f64| Some(TextAnimation { kind, duration });
+    let clips = vec![
+        // slide in from below, nothing on the way out
+        animated("t1", 0.0, a(TextAnimationType::SlideUp, 0.5), None, 0.0),
+        // zoom in, then slide out to the left, plus a fade the split must carry
+        animated(
+            "t2",
+            4.0,
+            a(TextAnimationType::ZoomIn, 0.6),
+            a(TextAnimationType::SlideLeft, 0.8),
+            0.3,
+        ),
+        // out-only
+        animated("t3", 8.0, None, a(TextAnimationType::ZoomOut, 0.5), 0.0),
+    ];
+    let p = project(vec![track(TrackKind::Text, clips)], vec![]);
+    insta::assert_snapshot!(vikado_renderer::ass::emit_ass(&p).content);
 }

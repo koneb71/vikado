@@ -4,20 +4,25 @@ import { findClip } from '@/lib/timelineOps'
 import {
   DEFAULT_CHROMA_KEY,
   FILTER_PRESETS,
+  TEXT_ANIMATIONS,
+  TEXT_TRANSFORMS,
   TRANSITION_TYPES,
   type AudioClip,
   type Clip,
   type ImageClip,
   type KeyframeProp,
+  type TextAnimation,
   type TextClip,
   type Transition,
   type VideoClip,
 } from '@/schema/project'
-import { FONT_FAMILIES } from '@/schema/fonts'
+import { fontsByCategory } from '@/schema/fonts'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -450,10 +455,15 @@ function TextInspector({ clip }: { clip: TextClip }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {FONT_FAMILIES.map((f) => (
-              <SelectItem key={f} value={f} style={{ fontFamily: f }}>
-                {f}
-              </SelectItem>
+            {fontsByCategory().map((group) => (
+              <SelectGroup key={group.category}>
+                <SelectLabel className="text-[10px] uppercase tracking-wide">{group.label}</SelectLabel>
+                {group.fonts.map((f) => (
+                  <SelectItem key={f.family} value={f.family} style={{ fontFamily: f.family }}>
+                    {f.family}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             ))}
           </SelectContent>
         </Select>
@@ -476,15 +486,92 @@ function TextInspector({ clip }: { clip: TextClip }) {
             <ToggleGroupItem value="right" aria-label="Align right"><AlignRight /></ToggleGroupItem>
           </ToggleGroup>
         </div>
+        <ToggleGroup type="single" variant="outline" size="sm" value={s.textTransform}
+          onValueChange={(t) => t && setStyle({ textTransform: t as typeof s.textTransform })}
+        >
+          {TEXT_TRANSFORMS.map((t) => (
+            <ToggleGroupItem key={t} value={t} className="text-[11px] capitalize">
+              {t === 'none' ? 'Aa' : t === 'uppercase' ? 'AA' : 'aa'}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <SliderRow label="Letter spacing" value={s.letterSpacing} min={-10} max={40} step={0.5} format={(v) => `${v}px`} onChange={(letterSpacing) => setStyle({ letterSpacing })} />
         <ColorRow label="Color" value={s.color} onChange={(color) => color && setStyle({ color })} />
         <ColorRow label="Background" value={s.backgroundColor} allowNone onChange={(backgroundColor) => setStyle({ backgroundColor })} />
         <ColorRow label="Outline" value={s.outlineColor} allowNone onChange={(outlineColor) => setStyle({ outlineColor })} />
         {s.outlineColor && (
           <SliderRow label="Outline width" value={s.outlineWidth} min={0} max={12} step={0.5} format={(v) => `${v}px`} onChange={(outlineWidth) => setStyle({ outlineWidth })} />
         )}
+        <ColorRow
+          label="Shadow"
+          value={s.shadow?.color ?? null}
+          allowNone
+          onChange={(color) => setStyle({ shadow: color ? { color, distance: s.shadow?.distance ?? 4 } : null })}
+        />
+        {s.shadow && !s.backgroundColor && (
+          <SliderRow label="Shadow distance" value={s.shadow.distance} min={0} max={30} step={1} format={(v) => `${v}px`}
+            onChange={(distance) => setStyle({ shadow: { color: s.shadow!.color, distance } })} />
+        )}
+        {s.shadow && s.backgroundColor && (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            A background box replaces the shadow — subtitles use one colour slot for both.
+          </p>
+        )}
+      </Section>
+      <Section title="Animation">
+        <AnimationRow label="In" value={clip.animationIn} onChange={(animationIn) => update({ animationIn })} />
+        <AnimationRow label="Out" value={clip.animationOut} onChange={(animationOut) => update({ animationOut })} />
       </Section>
       <TransformSection clip={clip} />
       <FadeSection clip={clip} />
+    </div>
+  )
+}
+
+/** Entrance/exit animation picker plus its length. */
+function AnimationRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: TextAnimation | null
+  onChange: (v: TextAnimation | null) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <span className="w-8 shrink-0 text-[11px] text-muted-foreground">{label}</span>
+        <Select
+          value={value?.type ?? 'none'}
+          onValueChange={(t) =>
+            onChange(t === 'none' ? null : { type: t as TextAnimation['type'], duration: value?.duration ?? 0.5 })
+          }
+        >
+          <SelectTrigger size="sm" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {TEXT_ANIMATIONS.map((t) => (
+              <SelectItem key={t} value={t} className="capitalize">
+                {t.replace('-', ' ')}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {value && (
+        <SliderRow
+          label="Length"
+          value={value.duration}
+          min={0.1}
+          max={3}
+          step={0.1}
+          format={(v) => `${v.toFixed(1)}s`}
+          onChange={(duration) => onChange({ ...value, duration })}
+        />
+      )}
     </div>
   )
 }

@@ -43,8 +43,11 @@ It ships as a single Docker container, so the whole editor is self-hostable.
 ### Effects and animation
 
 - Colour adjustments: brightness, contrast, saturation and temperature.
-- Six filter presets: grayscale, sepia, vintage, cool, warm and invert.
-- Six transitions: crossfade, fade-black, wipe-left, wipe-right, slide-left and slide-right.
+- Twelve filter presets: grayscale, sepia, vintage, cool, warm, invert, noir, vivid,
+  faded, cyberpunk, sunset and mint. Each is one colour matrix in the shader and the
+  equivalent ffmpeg chain in the renderer.
+- Eleven transitions: crossfade, fade through black or white, wipes in four directions
+  and slides in four directions.
 - Chroma key (green screen) with adjustable similarity and edge blend.
 - Background blur fill, so vertical media on a landscape canvas gets a blurred backdrop.
 - Source cropping.
@@ -54,10 +57,13 @@ It ships as a single Docker container, so the whole editor is self-hostable.
 
 ### Text and subtitles
 
-- Text overlays using the five bundled fonts: Inter, Roboto, Oswald, Playfair Display
-  and JetBrains Mono. The same TTFs feed the browser preview and libass on the server,
+- Text overlays using thirteen bundled fonts across sans, serif, display, script,
+  handwriting and mono. The same TTFs feed the browser preview and libass on the server,
   so text lands in the same place in both.
-- Six one-click style presets, alignment, outline, background box and fades.
+- Fourteen one-click style presets, plus alignment, outline, background box, drop
+  shadow, letter spacing, uppercase/lowercase and fades.
+- Entrance and exit animations: slide from any of four directions, zoom in or zoom out,
+  set independently for the way in and the way out.
 - A subtitle cue editor with SRT import and export.
 - Auto-captions from Whisper, running in the browser via `@huggingface/transformers`
   (`onnx-community/whisper-base`). It uses WebGPU where the browser exposes it and

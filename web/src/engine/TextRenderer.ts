@@ -1,4 +1,4 @@
-import type { TextStyle } from '@/schema/project'
+import { applyTextTransform, type TextStyle } from '@/schema/project'
 
 /**
  * Rasterizes text to a 2D canvas for texture upload. Results are cached by
@@ -24,20 +24,26 @@ export function renderText(text: string, style: TextStyle): RenderedText {
   const hit = cache.get(key)
   if (hit) return hit
 
-  const lines = text.split('\n')
+  const lines = applyTextTransform(text, style.textTransform).split('\n')
   const pad = style.fontSize * PADDING
   const lineHeight = style.fontSize * 1.25
+  // ASS reuses BackColour for both, and the box wins there, so it wins here
+  const shadow = style.backgroundColor ? null : style.shadow
 
   const measure = document.createElement('canvas').getContext('2d')!
   measure.font = fontString(style)
+  measure.letterSpacing = `${style.letterSpacing}px`
   const widths = lines.map((l) => measure.measureText(l).width)
   const textWidth = Math.max(1, ...widths)
 
   const canvas = document.createElement('canvas')
-  canvas.width = Math.ceil(textWidth + pad * 2)
-  canvas.height = Math.ceil(lineHeight * lines.length + pad * 2)
+  // the shadow falls down-right, so the canvas needs room for it
+  const shadowRoom = shadow ? shadow.distance : 0
+  canvas.width = Math.ceil(textWidth + pad * 2 + shadowRoom)
+  canvas.height = Math.ceil(lineHeight * lines.length + pad * 2 + shadowRoom)
   const ctx = canvas.getContext('2d')!
   ctx.font = fontString(style)
+  ctx.letterSpacing = `${style.letterSpacing}px`
   ctx.textBaseline = 'middle'
 
   if (style.backgroundColor) {
@@ -47,12 +53,19 @@ export function renderText(text: string, style: TextStyle): RenderedText {
     ctx.fill()
   }
 
+  const boxWidth = canvas.width - shadowRoom
   lines.forEach((line, i) => {
     const w = widths[i]
     const x =
-      style.align === 'left' ? pad : style.align === 'right' ? canvas.width - pad - w : (canvas.width - w) / 2
+      style.align === 'left' ? pad : style.align === 'right' ? boxWidth - pad - w : (boxWidth - w) / 2
     const y = pad + lineHeight * (i + 0.5)
 
+    if (shadow) {
+      // drawn as a real offset copy rather than ctx.shadow*, so it lands in
+      // exactly the place libass puts \shad: down and right by `distance`
+      ctx.fillStyle = shadow.color
+      ctx.fillText(line, x + shadow.distance, y + shadow.distance)
+    }
     if (style.outlineColor && style.outlineWidth > 0) {
       ctx.strokeStyle = style.outlineColor
       ctx.lineWidth = style.outlineWidth * 2

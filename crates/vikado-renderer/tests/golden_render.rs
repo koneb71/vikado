@@ -175,6 +175,9 @@ async fn transitions_filters_golden() {
                 outline_color: Some("#000000".into()),
                 outline_width: 2.0,
                 align: TextAlign::Center,
+                letter_spacing: 0.0,
+                shadow: None,
+                text_transform: TextTransform::None,
             },
             cues: vec![SubtitleCue {
                 id: "q1".into(),
@@ -209,4 +212,165 @@ async fn transitions_filters_golden() {
 
     let duration = probe_duration(&out);
     assert!((duration - 6.0).abs() < 0.2, "expected ~6s, got {duration}");
+}
+
+/// Every filter preset is authored ONCE as a 4x4 colour matrix in
+/// web/src/schema/filters.ts (the shader applies it with a single clamp at the
+/// end) and mirrored here as an ffmpeg chain. The two can silently diverge:
+/// `colorchannelmixer` clamps to [0,255] BEFORE a following `lutrgb` applies
+/// its constant, so a preset with a NEGATIVE offset reads back wrong wherever
+/// the mixer saturates — noir was 64/255 off in the highlights that way, which
+/// is why it uses `eq=contrast` instead.
+///
+/// This pushes solid colours (including the saturating extremes) through real
+/// ffmpeg and compares against the matrix the shader uses.
+#[test]
+#[ignore = "requires ffmpeg"]
+fn filter_presets_match_the_shader_matrices() {
+    // rows of [r, g, b, offset], exactly as in web/src/schema/filters.ts
+    let presets: &[(FilterPreset, [f64; 12])] = &[
+        (
+            FilterPreset::Grayscale,
+            [
+                0.299, 0.587, 0.114, 0.0, 0.299, 0.587, 0.114, 0.0, 0.299, 0.587, 0.114, 0.0,
+            ],
+        ),
+        (
+            FilterPreset::Sepia,
+            [
+                0.393, 0.769, 0.189, 0.0, 0.349, 0.686, 0.168, 0.0, 0.272, 0.534, 0.131, 0.0,
+            ],
+        ),
+        (
+            FilterPreset::Vintage,
+            [
+                0.5, 0.35, 0.1, 0.06, 0.3, 0.55, 0.1, 0.05, 0.2, 0.25, 0.4, 0.08,
+            ],
+        ),
+        (
+            FilterPreset::Cool,
+            [
+                0.92, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.02, 0.0, 0.0, 1.08, 0.03,
+            ],
+        ),
+        (
+            FilterPreset::Warm,
+            [
+                1.08, 0.0, 0.0, 0.03, 0.0, 1.0, 0.0, 0.02, 0.0, 0.0, 0.92, 0.0,
+            ],
+        ),
+        (
+            FilterPreset::Noir,
+            [
+                0.4485, 0.8805, 0.171, -0.25, 0.4485, 0.8805, 0.171, -0.25, 0.4485, 0.8805, 0.171,
+                -0.25,
+            ],
+        ),
+        (
+            FilterPreset::Vivid,
+            [
+                1.2804, -0.2348, -0.0456, 0.0, -0.1196, 1.1652, -0.0456, 0.0, -0.1196, -0.2348,
+                1.3544, 0.0,
+            ],
+        ),
+        (
+            FilterPreset::Faded,
+            [
+                0.7338, 0.0722, 0.014, 0.1, 0.0368, 0.7692, 0.014, 0.1, 0.0368, 0.0722, 0.711, 0.12,
+            ],
+        ),
+        (
+            FilterPreset::Cyberpunk,
+            [
+                1.15, 0.0, -0.05, 0.0, -0.05, 0.95, 0.1, 0.0, 0.1, 0.05, 1.2, 0.05,
+            ],
+        ),
+        (
+            FilterPreset::Sunset,
+            [
+                1.18, 0.06, 0.0, 0.04, 0.02, 0.98, 0.02, 0.0, 0.0, 0.04, 0.88, 0.03,
+            ],
+        ),
+        (
+            FilterPreset::Mint,
+            [
+                0.88, 0.02, 0.0, 0.0, 0.0, 1.06, 0.04, 0.02, 0.0, 0.06, 1.02, 0.03,
+            ],
+        ),
+    ];
+    // mid tones plus the extremes, where clamp ORDER shows up
+    let samples = [
+        (64u8, 128u8, 192u8),
+        (200, 60, 30),
+        (20, 20, 20),
+        (240, 240, 240),
+        (255, 255, 255),
+        (0, 0, 0),
+        (255, 0, 0),
+        (0, 255, 0),
+        (0, 0, 255),
+    ];
+    // BT.601 round trips through YUV inside ffmpeg, so a couple of levels of
+    // slack is expected; anything larger is a real mismatch in the chain.
+    const TOLERANCE: i32 = 8;
+
+    let mut failures = Vec::new();
+    for (preset, m) in presets {
+        let chain = vikado_renderer::filtergraph::preset_chain_for_test(*preset).join(",");
+        // the emitted chain escapes commas for filter_complex; undo that here
+        let chain = chain.replace("\\,", ",");
+        for (r, g, b) in samples {
+            let expect: Vec<i32> = (0..3)
+                .map(|i| {
+                    let v = m[i * 4] * r as f64 / 255.0
+                        + m[i * 4 + 1] * g as f64 / 255.0
+                        + m[i * 4 + 2] * b as f64 / 255.0
+                        + m[i * 4 + 3];
+                    (v.clamp(0.0, 1.0) * 255.0).round() as i32
+                })
+                .collect();
+            let got = run_chain(&chain, (r, g, b));
+            let diff = (0..3).map(|i| (expect[i] - got[i]).abs()).max().unwrap();
+            if diff > TOLERANCE {
+                failures.push(format!(
+                    "{preset:?} on rgb({r},{g},{b}): shader {expect:?} vs ffmpeg {got:?} (diff {diff})"
+                ));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "colour parity broke:\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+/// Push one solid colour through a filter chain and read the result back.
+fn run_chain(chain: &str, (r, g, b): (u8, u8, u8)) -> Vec<i32> {
+    let out = Command::new("ffmpeg")
+        .args([
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("color=c=#{r:02x}{g:02x}{b:02x}:s=8x8:d=0.1"),
+            "-vf",
+            &format!("format=rgb24,{chain},format=rgb24"),
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-",
+        ])
+        .output()
+        .expect("ffmpeg");
+    assert!(
+        out.status.success(),
+        "ffmpeg failed for chain {chain}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    out.stdout[..3].iter().map(|v| *v as i32).collect()
 }
