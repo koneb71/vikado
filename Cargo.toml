@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = ["crates/vikado-types", "crates/vikado-renderer", "crates/vikado-server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/koneb71/vikado"
+description = "Vikado, a local-first web video editor: project schema, ffmpeg render pipeline and render service."
+authors = ["The Vikado contributors"]
+keywords = ["video", "video-editing", "ffmpeg", "renderer", "timeline"]
+categories = ["multimedia::video", "multimedia::encoding", "web-programming::http-server"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ts-rs = { version = "10", features = ["serde-compat"] }
+thiserror = "2"
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v7", "serde"] }

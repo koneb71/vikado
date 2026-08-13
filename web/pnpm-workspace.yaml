@@ -1,0 +1,6 @@
+# Node-only optional deps of @huggingface/transformers; their native build
+# scripts are unnecessary for browser usage.
+allowBuilds:
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false

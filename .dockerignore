@@ -1,0 +1,12 @@
+target/
+web/node_modules/
+web/dist/
+web/public/fixtures/
+data/
+.git/
+.github/
+.claude/
+docs/
+fixtures/
+*.mp4
+*.md

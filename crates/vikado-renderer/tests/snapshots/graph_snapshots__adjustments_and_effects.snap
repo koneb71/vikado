@@ -1,0 +1,11 @@
+---
+source: crates/vikado-renderer/tests/graph_snapshots.rs
+expression: g.script
+---
+[0:v]trim=start=0:end=5,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,eq=brightness=0.1:contrast=1.2:saturation=0.7,lutrgb=r='clip(val+12.75\,0\,255)':b='clip(val-12.75\,0\,255)',hue=s=0,rotate=-0.174533:c=black@0:ow=2204:oh=2204,colorchannelmixer=aa=0.9,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=4:d=1:alpha=1,setpts=PTS+0/TB[c0];
+color=c=0x000000:s=1920x1080:r=30:d=5[base0];
+[base0][c0]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,0,5)'[base1];
+[base1]subtitles=f='/work/overlays.ass':fontsdir='/fonts'[vout];
+[0:a]atrim=start=0:end=5,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,afade=t=in:st=0:d=0.5,afade=t=out:st=4:d=1,adelay=0|0[a0];
+anullsrc=r=48000:cl=stereo:d=5[asilence];
+[asilence][a0]amix=inputs=2:duration=first:normalize=0[aout]

@@ -1,0 +1,17 @@
+services:
+  vikado:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3005:3000"
+    volumes:
+      - vikado-data:/data
+    environment:
+      VIKADO_DATA_DIR: /data
+      VIKADO_MAX_UPLOAD_BYTES: "2147483648" # 2 GB
+      VIKADO_MAX_CONCURRENT_RENDERS: "1"
+      VIKADO_JOB_TTL_HOURS: "24"
+
+volumes:
+  vikado-data:

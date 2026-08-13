@@ -1,0 +1,78 @@
+name: Feature request
+description: Suggest a capability or an improvement for the editor or the renderer.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search the existing issues first. If the idea is still vague, or you mainly want
+        to talk it through, open a blank issue instead — this form works best once you can name
+        the problem and a concrete change.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: >
+        Describe the editing task that is awkward or impossible today, not the solution you have
+        in mind. Concrete workflows ("I cut podcast clips and have to ...") are much easier to
+        design against than abstract requests.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: >
+        What should Vikado do instead? If it touches the UI, say where it would live (timeline,
+        inspector, a sidebar panel, the export dialog).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: sides
+    attributes:
+      label: Which side does this need?
+      description: >
+        The browser preview and the ffmpeg render must produce the same image, so anything that
+        changes pixels has to be built twice: once in the preview (GLSL/Canvas) and once in the
+        renderer's ffmpeg filter graph, with the contract between them documented on both sides.
+        A feature that only ships on one side would make the preview lie about the export, so it
+        will not be merged that way. Editing-only conveniences (shortcuts, selection, panels)
+        need the browser alone.
+      options:
+        - Preview / editor only — UI, timeline editing, playback, no change to exported pixels
+        - Renderer only — encoding, output format, ffmpeg graph, no change to the preview
+        - Both — a visual feature, so it needs a preview implementation and an ffmpeg implementation
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >
+        Other ways to solve the same problem, including workarounds you use today and how other
+        editors handle it.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, reference clips, links to how comparable tools do this.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues for this idea.
+          required: true
+        - label: >-
+            I agree to follow this project's
+            [Code of Conduct](https://github.com/koneb71/vikado/blob/main/CODE_OF_CONDUCT.md).
+          required: true
+        - label: I would be willing to work on this.

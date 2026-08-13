@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 300" width="920" height="300" role="img" aria-label="Vikado pipeline: the browser edits and previews a project; exporting sends the project JSON and source files to a Rust render service that compiles them into an ffmpeg filter graph and returns an MP4.">
+  <style>
+    .card { fill: #f6f7f9; stroke: #d5d8de; }
+    .card-accent { fill: #f3f0ff; stroke: #c7b8ff; }
+    .title { fill: #14161a; font: 600 15px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .body { fill: #5b616e; font: 12px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .edge { stroke: #9aa1ad; fill: none; }
+    .edge-label { fill: #5b616e; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .accent { fill: #7c5cff; }
+    .accent-text { fill: #6344e0; font: 600 12px ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    .note { fill: #5b616e; font: 12px ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    .arrowhead { fill: #9aa1ad; }
+    @media (prefers-color-scheme: dark) {
+      .card { fill: #1c1f26; stroke: #333844; }
+      .card-accent { fill: #241f38; stroke: #4c3f86; }
+      .title { fill: #e8eaf0; }
+      .body, .edge-label, .note { fill: #9aa1ad; }
+      .edge { stroke: #5a6270; }
+      .arrowhead { fill: #5a6270; }
+      .accent-text { fill: #a78bfa; }
+    }
+  </style>
+
+  <!-- browser -->
+  <rect class="card-accent" x="16" y="40" width="260" height="132" rx="12" stroke-width="1.5"/>
+  <text class="title" x="36" y="70">Your browser</text>
+  <text class="body" x="36" y="94">Timeline editing, WebGL2 preview</text>
+  <text class="body" x="36" y="114">Projects in IndexedDB</text>
+  <text class="body" x="36" y="134">Media in OPFS, addressed by hash</text>
+  <text class="accent-text" x="36" y="158">Nothing leaves the machine</text>
+
+  <!-- render service -->
+  <rect class="card" x="356" y="40" width="264" height="132" rx="12" stroke-width="1.5"/>
+  <text class="title" x="376" y="70">Render service (Rust)</text>
+  <text class="body" x="376" y="94">Project → filter_complex compiler</text>
+  <text class="body" x="376" y="114">ASS emitter for text + subtitles</text>
+  <text class="body" x="376" y="134">Supervises ffmpeg, parses progress</text>
+  <text class="accent-text" x="376" y="158">Stateless, self-hosted</text>
+
+  <!-- output -->
+  <rect class="card" x="700" y="40" width="204" height="132" rx="12" stroke-width="1.5"/>
+  <text class="title" x="720" y="70">MP4</text>
+  <text class="body" x="720" y="94">H.264 video + AAC audio</text>
+  <text class="body" x="720" y="114">Quality tier and output</text>
+  <text class="body" x="720" y="130">scale chosen at export</text>
+  <text class="accent-text" x="720" y="158">Downloaded to you</text>
+
+  <!-- edges -->
+  <path class="edge" d="M276 96 H344" stroke-width="1.5"/>
+  <polygon class="arrowhead" points="344,96 336,92 336,100"/>
+  <text class="edge-label" x="284" y="86">project JSON</text>
+  <text class="edge-label" x="284" y="118">+ source files</text>
+
+  <path class="edge" d="M620 96 H688" stroke-width="1.5"/>
+  <polygon class="arrowhead" points="688,96 680,92 680,100"/>
+  <text class="edge-label" x="628" y="86">ffmpeg</text>
+
+  <!-- progress return path -->
+  <path class="edge" d="M600 176 V196 H296 V176" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <polygon class="arrowhead" points="296,176 292,184 300,184"/>
+  <text class="edge-label" x="380" y="212">SSE progress, then the download link</text>
+
+  <!-- parity note -->
+  <rect class="card" x="16" y="236" width="888" height="48" rx="10" stroke-width="1.5"/>
+  <circle class="accent" cx="42" cy="260" r="5"/>
+  <text class="note" x="60" y="257">The design constraint: every visual feature is implemented twice — once as a shader or canvas</text>
+  <text class="note" x="60" y="273">operation for the preview, once as ffmpeg filters for the export — and the two must match.</text>
+</svg>

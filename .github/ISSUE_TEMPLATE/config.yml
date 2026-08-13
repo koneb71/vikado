@@ -1,0 +1,12 @@
+# Questions, setup help and half-formed ideas fit neither form, so blank issues
+# stay enabled rather than being funnelled into a bug report.
+blank_issues_enabled: true
+contact_links:
+  - name: Self-hosting and configuration
+    url: https://github.com/koneb71/vikado/blob/main/docs/SELF_HOSTING.md
+    about: >-
+      Running the render service yourself: Docker, ports, environment variables and limits.
+  - name: Contributing guide
+    url: https://github.com/koneb71/vikado/blob/main/CONTRIBUTING.md
+    about: >-
+      Development setup, the test suite, and the parity rules for changing a visual feature.

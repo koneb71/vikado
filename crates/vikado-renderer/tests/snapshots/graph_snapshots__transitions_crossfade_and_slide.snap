@@ -1,0 +1,17 @@
+---
+source: crates/vikado-renderer/tests/graph_snapshots.rs
+expression: g.script
+---
+[0:v]trim=start=0:end=4.5,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,setpts=PTS+0/TB[c0];
+[1:v]trim=start=0.5:end=4.3,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,fade=t=in:st=0:d=1:alpha=1,setpts=PTS+3.5/TB[c1];
+[2:v]trim=start=0:end=2.3,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,setpts=PTS+6.7/TB[c2];
+color=c=0x000000:s=1920x1080:r=30:d=9[base0];
+[base0][c0]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,0,4.5)'[base1];
+[base1][c1]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,3.5,7.3)'[base2];
+[base2][c2]overlay=x='(main_w-overlay_w)/2+0+main_w*(1-clip((t-6.7)/0.6\,0\,1))':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,6.7,9)'[base3];
+[base3]null[vout];
+[0:a]atrim=start=0:end=4,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=0|0[a0];
+[1:a]atrim=start=1:end=4,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=4000|4000[a1];
+[2:a]atrim=start=0:end=2,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=7000|7000[a2];
+anullsrc=r=48000:cl=stereo:d=9[asilence];
+[asilence][a0][a1][a2]amix=inputs=4:duration=first:normalize=0[aout]

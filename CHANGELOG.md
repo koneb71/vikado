@@ -1,0 +1,147 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2026-08-13
+
+Initial public release. Vikado is a local-first, web-based video editor: the browser
+does all editing and real-time preview, and a stateless Rust service renders the final
+MP4 with ffmpeg.
+
+### Added
+
+#### Timeline
+
+- Multi-track timeline with video, audio and text tracks (track 0 is the bottom layer;
+  video tracks accept both video and image clips).
+- Trim, split, move (including across tracks), duplicate, and copy/paste of clips.
+- Edge snapping to clip boundaries, the playhead and the timeline start, with on-screen
+  guides; toggleable.
+- Drag and drop from the media panel onto a track.
+- Per-clip filmstrip thumbnails and audio waveforms, cached in IndexedDB by content
+  hash.
+- Right-click clip context menu, drag-resizable timeline dock, and keyboard shortcuts
+  with an in-app reference dialog.
+- Undo/redo across all project edits, up to 200 steps (zundo).
+
+#### Media
+
+- Import of video, audio and image files.
+- Content-addressed storage: media files live in OPFS under the SHA-256 of their bytes,
+  and the project document is autosaved to IndexedDB. Nothing is uploaded until an
+  export is requested.
+- Metadata probing via mp4box with a media-element fallback.
+- Screen and webcam recording through MediaRecorder, with optional microphone mixing.
+  WebM blobs that report an infinite duration are repaired on save, and the prober has a
+  seek-to-end backstop for any that slip through.
+
+#### Clip properties
+
+- Playback speed from 0.25x to 4x, with pitch-corrected audio (chained `atempo` on the
+  render side).
+- Horizontal and vertical flip.
+- Position, scale, rotation and opacity.
+- Per-clip volume and fade in/out; a video clip's fade covers opacity and audio
+  together. Video clips and whole tracks can be muted.
+
+#### Keyframe animation
+
+- Keyframes on x, y, scale, rotation and opacity, with linear, ease-in, ease-out and
+  ease-in-out easing between them.
+- Diamond toggles in the inspector and keyframe markers on the timeline clip.
+- Values interpolate between keyframes and clamp outside the keyframed range; keyframe
+  times are clip-local, so they survive moving the clip.
+
+#### Effects
+
+- Color adjustments: brightness, contrast, saturation and temperature.
+- Six filter presets: grayscale, sepia, vintage, cool, warm and invert.
+- Six transitions between adjacent clips: crossfade, fade-black, wipe-left, wipe-right,
+  slide-left and slide-right.
+- Chroma key (green screen) with adjustable similarity and edge blend.
+- Background blur fill, so vertical or off-aspect footage fills the canvas.
+- Source crop.
+
+#### Text and subtitles
+
+- Text overlays using five bundled OFL fonts (Inter, Roboto, Oswald, Playfair Display,
+  JetBrains Mono), with size, weight, italics, color, alignment, outline, background box
+  and fades.
+- Six one-tap text style presets.
+- Subtitle track with a manual cue editor and SRT import/export.
+- Auto-captions generated entirely in the browser with Whisper
+  (`@huggingface/transformers`, `onnx-community/whisper-base`), using WebGPU when
+  available and falling back to WebAssembly. The model is cached after the first
+  download. Eleven selectable languages plus auto-detect, with de-duplication of text
+  repeated across transcription window seams.
+
+#### Utilities
+
+- Detach audio: splits a video clip's sound onto its own audio track and mutes the
+  video clip.
+- Freeze frame: captures the frame the selected video clip shows at the playhead as a
+  still image, then ripple-inserts it across every track and shifts the subtitle cues,
+  so detached audio, overlays and captions stay in sync.
+
+#### Export
+
+- Server-side MP4 render (H.264 via libx264, AAC audio, yuv420p).
+- Quality tier (draft, standard, high) and output resolution scale (100%, 75%, 50%).
+- Live progress over server-sent events, then a direct download.
+
+#### Project settings
+
+- Canvas size presets (1920x1080, 1280x720, 1080x1920, 1080x1080), frame rate
+  (24, 25, 30, 50, 60) and canvas background color.
+
+#### Backend
+
+- `vikado-types`: the serde + ts-rs schema crate, the single source of truth for the
+  project format. TypeScript bindings are exported into `web/src/generated` and a
+  compile-time drift check fails the frontend build if the two sides diverge.
+- `vikado-renderer`: compiles a project into a single ffmpeg `filter_complex` graph
+  using the same overlay-stack model as the preview, emits ASS for text and subtitles
+  (rendered by libass from the same bundled TTFs the browser uses), and supervises the
+  ffmpeg process while parsing progress. Ships a CLI for rendering a project without a
+  server.
+- `vikado-server`: an Axum job API under `/api/v1` — create a job, upload assets by
+  content hash, submit a render, follow progress over SSE or by polling, download the
+  result, and delete the job. Jobs live in per-job workspaces under a configurable data
+  directory and are swept on a TTL. The server also serves the built frontend.
+
+#### Preview and render parity
+
+- Every visual feature is implemented twice, once in GLSL/Canvas for the preview and
+  once as ffmpeg filters for the render, with contract comments on both sides that must
+  be changed together: color math, filter presets, chroma key, keyframe sampling, text
+  layout and fonts, crop clamping, and transition windows.
+- Chroma keying uses ffmpeg's RGB `colorkey` rather than the YUV `chromakey` filter.
+  `chromakey` compares limited-range video planes against a full-range key color, which
+  introduces a colorspace-dependent threshold offset (about 0.046 on BT.601) that a
+  browser cannot reproduce — the preview would key more aggressively than the export.
+
+#### Packaging
+
+- Single-container Docker image (multi-stage build: node, then rust, then a Debian
+  runtime with ffmpeg) plus a hot-reload development compose file.
+- MIT license.
+
+### Known limitations
+
+- The render service has no authentication and permissive CORS. Do not expose it to an
+  untrusted network without putting your own access control in front of it.
+- Exporting requires the backend; there is no client-side export path.
+- Text clips cannot be keyframe-animated. libass cannot express it, so the editor hides
+  the keyframe toggles for text rather than let the preview and the export disagree.
+- Background blur parity is approximate: the preview's Canvas2D blur and ffmpeg's
+  `gblur` match in geometry and content, but not in the exact kernel.
+- Heavily layered projects strain the preview: the media pool keeps at most six decoded
+  video elements alive and evicts the least recently used, so projects with more
+  simultaneous video layers than that will thrash.
+- The preview seeks real `<video>` elements, so scrubbing long-GOP sources feels
+  sluggish, especially backwards.
+
+[0.1.0]: https://github.com/koneb71/vikado/releases/tag/v0.1.0

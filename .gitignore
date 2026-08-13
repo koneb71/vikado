@@ -1,0 +1,21 @@
+# Rust
+target/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# OS / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+.claude/
+
+# Vikado runtime data (per-job render workspaces)
+data/
+
+# Fixture media copied into the dev server for in-browser testing.
+# Populate it when you need it:  cp fixtures/media/* web/public/fixtures/
+web/public/fixtures/

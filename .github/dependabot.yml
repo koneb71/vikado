@@ -1,0 +1,75 @@
+# Weekly dependency updates, grouped so a normal week produces a handful of PRs
+# rather than one per package. The cargo and npm catch-all groups take minor and
+# patch bumps only, so a major bump of anything outside the named groups below
+# arrives as its own PR and gets reviewed on its own.
+version: 2
+
+updates:
+  # Rust workspace: one Cargo.toml / Cargo.lock at the root covers all three crates.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      cargo-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # Frontend: the pnpm project lives in web/.
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # React and its type packages have to move together, majors included.
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      # Same for Tailwind, its Vite plugin and the animation utilities.
+      tailwind:
+        patterns:
+          - tailwindcss
+          - "@tailwindcss/*"
+          - tw-animate-css
+      # Everything else that is not a major bump.
+      npm-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # Actions used by .github/workflows/ci.yml. There are only a handful, so they
+  # all move in one PR, major bumps included.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

@@ -1,0 +1,14 @@
+---
+source: crates/vikado-renderer/tests/graph_snapshots.rs
+expression: g.script
+---
+[0:v]trim=start=1:end=9,setpts=(PTS-STARTPTS)/2,fps=30,hflip,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,setpts=PTS+0/TB[c0];
+[1:v]trim=start=0:end=0.5,setpts=(PTS-STARTPTS)/0.25,fps=30,vflip,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*1':h='min(1920/iw\,1080/ih)*ih*1':eval=init,setpts=PTS+4/TB[c1];
+color=c=0x1a2b3c:s=1920x1080:r=30:d=6[base0];
+[base0][c0]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,0,4)'[base1];
+[base1][c1]overlay=x='(main_w-overlay_w)/2+0':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,4,6)'[base2];
+[base2]null[vout];
+[0:a]atrim=start=1:end=9,asetpts=PTS-STARTPTS,atempo=2,aresample=48000,aformat=channel_layouts=stereo,adelay=0|0[a0];
+[1:a]atrim=start=0:end=0.5,asetpts=PTS-STARTPTS,atempo=0.5,atempo=0.5,aresample=48000,aformat=channel_layouts=stereo,adelay=4000|4000[a1];
+anullsrc=r=48000:cl=stereo:d=6[asilence];
+[asilence][a0][a1]amix=inputs=3:duration=first:normalize=0[aout]

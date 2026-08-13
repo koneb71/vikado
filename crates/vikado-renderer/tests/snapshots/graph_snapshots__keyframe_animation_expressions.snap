@@ -1,0 +1,11 @@
+---
+source: crates/vikado-renderer/tests/graph_snapshots.rs
+expression: g.script
+---
+[0:v]trim=start=0:end=4,setpts=PTS-STARTPTS,fps=30,format=rgba,scale=w='min(1920/iw\,1080/ih)*iw*(if(lt(t\,0)\,0.5\,if(lt(t\,2)\,0.5+0.5*st(0\,(t-0)/2)*ld(0)\,if(lt(t\,4)\,1+-0.2*st(0\,(t-2)/2)*(2-ld(0))\,0.8))))':h='min(1920/iw\,1080/ih)*ih*(if(lt(t\,0)\,0.5\,if(lt(t\,2)\,0.5+0.5*st(0\,(t-0)/2)*ld(0)\,if(lt(t\,4)\,1+-0.2*st(0\,(t-2)/2)*(2-ld(0))\,0.8))))':eval=frame,rotate=a='if(lt(t\,0)\,0\,if(lt(t\,4)\,0+1.570796*st(0\,(t-0)/4)*ld(0)*(3-2*ld(0))\,1.570796))':c=black@0:ow=2204:oh=2204,geq=a='alpha(X\,Y)*(if(lt(T\,3)\,1\,if(lt(T\,4)\,1+-1*st(0\,(T-3)/1)\,0)))':r='r(X\,Y)':g='g(X\,Y)':b='b(X\,Y)',setpts=PTS+2/TB[c0];
+color=c=0x000000:s=1920x1080:r=30:d=6[base0];
+[base0][c0]overlay=x='(main_w-overlay_w)/2+(if(lt((t-2)\,0)\,-200\,if(lt((t-2)\,4)\,-200+400*st(0\,((t-2)-0)/4)\,200)))':y='(main_h-overlay_h)/2+0':eof_action=pass:enable='between(t,2,6)'[base1];
+[base1]null[vout];
+[0:a]atrim=start=0:end=4,asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,adelay=2000|2000[a0];
+anullsrc=r=48000:cl=stereo:d=6[asilence];
+[asilence][a0]amix=inputs=2:duration=first:normalize=0[aout]

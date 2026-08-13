@@ -1,0 +1,33 @@
+# Development with hot reload: Vite on :5173 proxying /api to the server on :3000.
+# Run only the frontend with:  docker compose -f docker-compose.dev.yml up web
+services:
+  web:
+    image: node:22-slim
+    working_dir: /app/web
+    command: sh -c "corepack enable && pnpm install && pnpm dev --host"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app/web
+      - web-node-modules:/app/web/node_modules
+    environment:
+      VIKADO_API_URL: http://server:3000
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    command: cargo watch -x 'run -p vikado-server'
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - cargo-target:/app/target
+      - vikado-dev-data:/data
+    environment:
+      VIKADO_DATA_DIR: /data
+
+volumes:
+  web-node-modules:
+  cargo-target:
+  vikado-dev-data:

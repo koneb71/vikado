@@ -1,0 +1,7 @@
+# Default reviewer for everything.
+* @koneb71
+
+# The schema is the contract between the editor and the renderer: a change here
+# has to land on both sides at once, so it always gets a look.
+/crates/vikado-types/ @koneb71
+/web/src/schema/ @koneb71

@@ -1,0 +1,147 @@
+name: Bug report
+description: Something in the editor, the preview or the exported MP4 behaves incorrectly.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug.
+
+        Please search the open issues first — someone may have reported this already.
+        Questions and setup help do not need this form: open a blank issue instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+      description: Describe the actual behaviour first, then the behaviour you expected.
+      placeholder: |
+        A green-screen clip keys cleanly in the preview, but the exported MP4 keeps a green
+        fringe around the subject. I expected the exported frame to match the preview.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Number the steps from an empty project. If the source media matters, say what it is
+        (container, codec, resolution, frame rate, duration) — many bugs only reproduce with
+        a particular kind of file.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where does the problem appear?
+      description: >
+        Every visual feature in Vikado is implemented twice — once in the browser preview
+        (a WebGL2 compositor, with text rasterized on a 2D canvas) and once as ffmpeg
+        filters in the Rust renderer — and the two are required to produce the same image.
+        Which side is wrong is the single most useful triage signal in this project, so
+        please check both before answering.
+      options:
+        - Preview only — the browser looks wrong, the exported MP4 is correct
+        - Export only — the preview looks correct, the exported MP4 is wrong
+        - Both — preview and export are wrong in the same way
+        - Not a visual problem — UI, timeline editing, import, recording, crash, performance
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or sample frames
+      description: >
+        For a preview/export mismatch, a screenshot of the preview plus the same frame taken
+        from the exported MP4 is worth more than any description. Attach files by dragging
+        them into this box. If you are driving the renderer CLI, attach the project JSON you
+        passed to it as well.
+
+  - type: dropdown
+    id: how-running
+    attributes:
+      label: How are you running Vikado?
+      description: >
+        If you started the render service by hand, say whether you set
+        `VIKADO_FONTS_DIR=web/public/fonts` (or passed `--fonts` to the CLI). Without it the
+        server hands libass no font directory, so exported text and subtitles fall back to
+        system fonts and stop matching the preview.
+      options:
+        - Docker Compose — docker compose up --build, on http://localhost:3005
+        - Docker dev compose — docker compose -f docker-compose.dev.yml up --build
+        - Dev servers — pnpm dev, plus cargo run -p vikado-server
+        - Renderer CLI only — cargo run -p vikado-renderer
+        - Other (describe in the steps above)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: >
+        The commit you built from (`git rev-parse --short HEAD`), or the version the server
+        reports: `curl http://localhost:3005/api/v1/version` for the Docker Compose setup,
+        `curl http://localhost:3000/api/v1/version` if you run the server directly.
+      placeholder: 0.1.0 / a1b2c3d
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      description: >
+        The preview requires WebGL2; in-browser auto-captions use WebGPU when it is available
+        and fall back to wasm. Leave blank for renderer-CLI-only bugs.
+      placeholder: Chrome 141 / Firefox 145 / Safari 26
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.2 (Apple Silicon) / Ubuntu 24.04 / Windows 11 + WSL2
+    validations:
+      required: true
+
+  - type: input
+    id: ffmpeg
+    attributes:
+      label: ffmpeg version
+      description: >
+        First line of `ffmpeg -version`. Only needed if you self-host outside the provided
+        Docker image — that image installs ffmpeg from Debian bookworm, so leave this blank
+        when you use it.
+      placeholder: ffmpeg version 6.1.1-3ubuntu5
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error output
+      description: >
+        If the export failed, paste the message shown in the export dialog — it carries the
+        tail of ffmpeg's stderr — and the `vikado-server` log for that job if you have access
+        to it. For preview bugs, paste the browser console output instead.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: >-
+            I agree to follow this project's
+            [Code of Conduct](https://github.com/koneb71/vikado/blob/main/CODE_OF_CONDUCT.md).
+          required: true
+        - label: I can still reproduce this on a fresh build of `main`.
