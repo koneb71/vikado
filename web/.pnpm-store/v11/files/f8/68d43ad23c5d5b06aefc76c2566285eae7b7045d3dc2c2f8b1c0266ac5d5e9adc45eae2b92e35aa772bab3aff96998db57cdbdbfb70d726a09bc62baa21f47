@@ -1,0 +1,91 @@
+{
+  "name": "mp4box",
+  "version": "2.4.1",
+  "description": "JavaScript version of GPAC's MP4Box tool",
+  "type": "module",
+  "keywords": [
+    "mp4",
+    "HTML 5 media",
+    "Media Source Extension",
+    "streaming"
+  ],
+  "homepage": "https://github.com/gpac/mp4box.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/gpac/mp4box.js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gpac/mp4box.js/issues"
+  },
+  "author": {
+    "name": "Cyril Concolato",
+    "email": "cyril.concolato@telecom-paristech.fr",
+    "url": "http://concolato.wp.mines-telecom.fr/"
+  },
+  "engines": {
+    "node": ">=20.8.1"
+  },
+  "license": "BSD-3-Clause",
+  "main": "./dist/mp4box.all.js",
+  "types": "./dist/mp4box.all.d.ts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/mp4box.all.d.mts",
+        "require": "./dist/mp4box.all.d.cts"
+      },
+      "import": "./dist/mp4box.all.mjs",
+      "require": "./dist/mp4box.all.cjs"
+    },
+    "./simple": {
+      "types": {
+        "import": "./dist/mp4box.simple.d.mts",
+        "require": "./dist/mp4box.simple.d.cts"
+      },
+      "import": "./dist/mp4box.simple.mjs",
+      "require": "./dist/mp4box.simple.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
+  },
+  "scripts": {
+    "prepare": "node .husky/install.mjs",
+    "changeset": "changeset",
+    "build": "tsdown",
+    "release": "npm run build && changeset publish",
+    "circular": "dpdm -T ./entries/all.ts --tsconfig tsconfig.lib.json --exit-code circular:1",
+    "types": "tsc --noEmit -p tsconfig.lib.json",
+    "test": "vitest run",
+    "test:dev": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^9.27.0",
+    "@types/node": "^25.9.3",
+    "@vitest/coverage-v8": "^4.1.9",
+    "dpdm": "^4.2.0",
+    "eslint": "^9.27.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-unicorn": "^60.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
+    "prettier": "^3.8.4",
+    "tar": "^7.5.16",
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^4.1.9"
+  },
+  "packageManager": "npm@11.17.0"
+}

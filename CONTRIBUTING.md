@@ -79,7 +79,8 @@ drawn with some other font — a preview/export mismatch rather than an error.
 
 | Port | Process | Notes |
 | --- | --- | --- |
-| 5173 | Vite dev server | The editor you open in the browser. Set `PORT` to move it. |
+| 5173 | Vite dev server (`pnpm dev`) | The editor you open in the browser. Set `PORT` to move it. |
+| 51731 | Vite dev server (`docker compose -f docker-compose.dev.yml up`) | Not 5173, which collides constantly. Host and container port are kept equal so Vite's HMR websocket — whose URL the client derives from the browser location — reaches the dev server. `VIKADO_WEB_PORT` overrides both. |
 | 3000 | `vikado-server` | Serves the job API under `/api/v1`. Set `VIKADO_PORT` to move it. |
 | 3005 | `docker compose up` | Host port mapped to container 3000 in `docker-compose.yml`. `VIKADO_PORT` overrides. |
 | 3006 | `docker compose -f docker-compose.dev.yml up` | Host port for the dev server. Deliberately not 3005, so the dev and production stacks can run side by side. `VIKADO_DEV_PORT` overrides. |
@@ -118,7 +119,7 @@ both. It listens on host port 3005.
 docker compose up --build
 ```
 
-Both halves also run in containers with hot reload — Vite on 5173, `cargo watch`
+Both halves also run in containers with hot reload — Vite on 51731, `cargo watch`
 rebuilding the server on host port 3006.
 
 ```sh

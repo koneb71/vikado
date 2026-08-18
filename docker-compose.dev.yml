@@ -3,7 +3,7 @@
 #
 # Host ports are overridable because :3000 and :5173 are heavily contested
 # defaults. Set them in .env or inline:
-#   VIKADO_DEV_PORT=3010 docker compose -f docker-compose.dev.yml up
+#   VIKADO_DEV_PORT=3010 VIKADO_WEB_PORT=51732 docker compose -f docker-compose.dev.yml up
 # The default differs from docker-compose.yml's 3005 on purpose, so running
 # the dev stack does not fight a production container already up.
 # The CONTAINER port stays 3000 — VIKADO_API_URL below addresses the service
@@ -14,11 +14,16 @@ services:
     working_dir: /app/web
     command: sh -c "corepack enable && pnpm install && pnpm dev --host"
     ports:
-      - "${VIKADO_WEB_PORT:-5173}:5173"
+      # host and container port are deliberately the SAME: Vite derives its HMR
+      # websocket URL from the browser's location, so a remapped port would
+      # have the client dialling a port the dev server is not on.
+      - "${VIKADO_WEB_PORT:-51731}:${VIKADO_WEB_PORT:-51731}"
     volumes:
       - ./web:/app/web
       - web-node-modules:/app/web/node_modules
     environment:
+      # vite.config.ts reads PORT; keep it equal to the published port above
+      PORT: "${VIKADO_WEB_PORT:-51731}"
       VIKADO_API_URL: http://server:3000
 
   server:

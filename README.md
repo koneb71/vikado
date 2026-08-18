@@ -147,7 +147,7 @@ cargo run -p vikado-renderer -- project.json assets-dir out.mp4 --fonts web/publ
 ```
 
 Both halves also run in Docker with hot reload — the editor on
-<http://localhost:5173>, the render service on host port 3006 (container 3000).
+<http://localhost:51731>, the render service on host port 3006 (container 3000).
 Override either with `VIKADO_WEB_PORT` / `VIKADO_DEV_PORT`.
 
 ```sh
