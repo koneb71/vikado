@@ -63,10 +63,9 @@ fontconfig.
 
 ## Running with Docker Compose
 
-The bundled `docker-compose.yml` builds the image, publishes host port 3005 (override with
-`VIKADO_PORT`) to container
-port 3000, mounts a named volume at `/data`, and sets the upload limit, render concurrency
-and job TTL explicitly.
+The bundled `docker-compose.yml` builds the image, publishes host port 3005 (override it
+with `VIKADO_PORT`) to container port 3000, mounts a named volume at `/data`, and sets the
+upload limit, render concurrency and job TTL explicitly.
 
 ```sh
 docker compose up --build -d
@@ -120,6 +119,31 @@ Note that the dev compose file does not set `VIKADO_FONTS_DIR`, so text and subt
 renders from that container will not use the bundled fonts. Set
 `VIKADO_FONTS_DIR=/app/web/public/fonts` on the `server` service if you are checking text
 output.
+
+## Dokploy (and other Traefik-fronted hosts)
+
+Deploy `docker-compose.dokploy.yml`, and set the port in the Dokploy UI to **3000**.
+
+That 3000 is the *container* port. Dokploy runs Traefik as its ingress and reaches the
+container over the shared `dokploy-network`, so the host-side numbers used by the local
+compose files (3005, 3006, 51731) are irrelevant here — and publishing any host port from
+a Dokploy stack is what produces:
+
+```
+Bind for 0.0.0.0:3000 failed: port is already allocated
+```
+
+The Dokploy host already has 3000 in use. `docker-compose.dokploy.yml` therefore uses
+`expose:` rather than `ports:`, and joins `dokploy-network` as an external network.
+
+Do not deploy `docker-compose.dev.yml`. Its services are named `web` and `server` rather
+than `vikado`, and they exist to bind-mount the source tree and run `pnpm install`,
+`pnpm dev` and `cargo watch` on every boot — a laptop hot-reload loop, not a deployment.
+If a Dokploy build is failing on a container named `…-web-1` or `…-server-1`, that is the
+file it picked up.
+
+Deploying from the Dockerfile directly instead of a compose file works too: Dokploy builds
+`docker/Dockerfile` and asks for one port, which is again 3000.
 
 ## Running with plain `docker run`
 

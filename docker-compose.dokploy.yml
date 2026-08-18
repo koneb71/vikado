@@ -1,0 +1,40 @@
+# Deployment compose for Dokploy (or any Traefik-fronted host).
+#
+# The difference from docker-compose.yml is that NOTHING is published to a host
+# port. Dokploy runs Traefik as the ingress and reaches the container over
+# `dokploy-network`, so a `ports:` mapping here buys nothing and actively
+# breaks deploys: the host already has :3000 in use, and the bind fails with
+# "Bind for 0.0.0.0:3000 failed: port is already allocated".
+#
+# In the Dokploy UI, the port to route to is the CONTAINER port: 3000.
+# Do not use 3005/3006/51731 — those exist only for local `docker compose`.
+#
+# Deploy this file, NOT docker-compose.dev.yml: the dev stack bind-mounts the
+# source tree and runs `pnpm install` and `cargo watch` on every boot.
+services:
+  vikado:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    # visible to Traefik on the shared network, not to the host
+    expose:
+      - "3000"
+    volumes:
+      - vikado-data:/data
+    environment:
+      VIKADO_PORT: "3000"
+      VIKADO_DATA_DIR: /data
+      VIKADO_MAX_UPLOAD_BYTES: "2147483648" # 2 GB
+      VIKADO_MAX_CONCURRENT_RENDERS: "1"
+      VIKADO_JOB_TTL_HOURS: "24"
+    networks:
+      - dokploy-network
+
+volumes:
+  vikado-data:
+
+networks:
+  # created by Dokploy itself; this stack joins it rather than defining it
+  dokploy-network:
+    external: true
