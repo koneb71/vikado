@@ -81,7 +81,8 @@ drawn with some other font — a preview/export mismatch rather than an error.
 | --- | --- | --- |
 | 5173 | Vite dev server | The editor you open in the browser. Set `PORT` to move it. |
 | 3000 | `vikado-server` | Serves the job API under `/api/v1`. Set `VIKADO_PORT` to move it. |
-| 3005 | `docker compose up` | The host port mapped to container port 3000 in `docker-compose.yml`. |
+| 3005 | `docker compose up` | Host port mapped to container 3000 in `docker-compose.yml`. `VIKADO_PORT` overrides. |
+| 3006 | `docker compose -f docker-compose.dev.yml up` | Host port for the dev server. Deliberately not 3005, so the dev and production stacks can run side by side. `VIKADO_DEV_PORT` overrides. |
 
 Vite proxies `/api` to `http://localhost:3000` by default. If you move the
 service, point the frontend at it with `VIKADO_API_URL`:
@@ -118,7 +119,7 @@ docker compose up --build
 ```
 
 Both halves also run in containers with hot reload — Vite on 5173, `cargo watch`
-rebuilding the server on 3000.
+rebuilding the server on host port 3006.
 
 ```sh
 docker compose -f docker-compose.dev.yml up --build

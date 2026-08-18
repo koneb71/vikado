@@ -1,10 +1,12 @@
+# Host port is overridable, since :3000 is a heavily contested default:
+#   VIKADO_PORT=3010 docker compose up --build
 services:
   vikado:
     build:
       context: .
       dockerfile: docker/Dockerfile
     ports:
-      - "3005:3000"
+      - "${VIKADO_PORT:-3005}:3000"
     volumes:
       - vikado-data:/data
     environment:

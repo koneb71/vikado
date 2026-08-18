@@ -1,12 +1,20 @@
-# Development with hot reload: Vite on :5173 proxying /api to the server on :3000.
+# Development with hot reload: Vite proxying /api to the server.
 # Run only the frontend with:  docker compose -f docker-compose.dev.yml up web
+#
+# Host ports are overridable because :3000 and :5173 are heavily contested
+# defaults. Set them in .env or inline:
+#   VIKADO_DEV_PORT=3010 docker compose -f docker-compose.dev.yml up
+# The default differs from docker-compose.yml's 3005 on purpose, so running
+# the dev stack does not fight a production container already up.
+# The CONTAINER port stays 3000 — VIKADO_API_URL below addresses the service
+# over the compose network, so it must not follow the host port.
 services:
   web:
     image: node:22-slim
     working_dir: /app/web
     command: sh -c "corepack enable && pnpm install && pnpm dev --host"
     ports:
-      - "5173:5173"
+      - "${VIKADO_WEB_PORT:-5173}:5173"
     volumes:
       - ./web:/app/web
       - web-node-modules:/app/web/node_modules
@@ -19,7 +27,7 @@ services:
       dockerfile: docker/Dockerfile.dev
     command: cargo watch -x 'run -p vikado-server'
     ports:
-      - "3000:3000"
+      - "${VIKADO_DEV_PORT:-3006}:3000"
     volumes:
       - .:/app
       - cargo-target:/app/target

@@ -36,4 +36,5 @@ browser (IndexedDB + OPFS), the backend is a stateless render service.
 - Backend: `cargo test` (snapshot tests via insta), golden renders (needs ffmpeg):
   `cargo test -p vikado-renderer --test golden_render -- --ignored`.
 - Server: `VIKADO_PORT=3111 cargo run -p vikado-server`.
-- Docker: `docker compose up --build` → http://localhost:3000.
+- Docker: `docker compose up --build` → http://localhost:3005 (host port; `VIKADO_PORT`
+  overrides). Dev stack publishes the server on 3006 (`VIKADO_DEV_PORT`) and Vite on 5173.

@@ -63,7 +63,8 @@ fontconfig.
 
 ## Running with Docker Compose
 
-The bundled `docker-compose.yml` builds the image, publishes host port 3005 to container
+The bundled `docker-compose.yml` builds the image, publishes host port 3005 (override with
+`VIKADO_PORT`) to container
 port 3000, mounts a named volume at `/data`, and sets the upload limit, render concurrency
 and job TTL explicitly.
 

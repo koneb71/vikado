@@ -111,7 +111,8 @@ docker compose up --build
 
 Then open <http://localhost:3005>.
 
-`docker-compose.yml` maps host port 3005 to port 3000 in the container; edit the
+`docker-compose.yml` maps host port 3005 to port 3000 in the container. Override it
+with `VIKADO_PORT` if 3005 is taken (`VIKADO_PORT=3010 docker compose up --build`); edit the
 mapping to use a different host port. Render jobs are written to the `vikado-data`
 volume and swept after `VIKADO_JOB_TTL_HOURS` (24 by default).
 
@@ -146,7 +147,8 @@ cargo run -p vikado-renderer -- project.json assets-dir out.mp4 --fonts web/publ
 ```
 
 Both halves also run in Docker with hot reload — the editor on
-<http://localhost:5173>, the render service on port 3000.
+<http://localhost:5173>, the render service on host port 3006 (container 3000).
+Override either with `VIKADO_WEB_PORT` / `VIKADO_DEV_PORT`.
 
 ```sh
 docker compose -f docker-compose.dev.yml up --build
