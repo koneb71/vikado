@@ -122,28 +122,64 @@ output.
 
 ## Dokploy (and other Traefik-fronted hosts)
 
-Deploy `docker-compose.dokploy.yml`, and set the port in the Dokploy UI to **3000**.
+**The port is 3000.** That is the *container* port — the one `docker/Dockerfile` sets and
+exposes. Dokploy fronts everything with Traefik and reaches the container over its shared
+`dokploy-network`, so the host-side numbers used by the local compose files (3005, 3006,
+51731) mean nothing here.
 
-That 3000 is the *container* port. Dokploy runs Traefik as its ingress and reaches the
-container over the shared `dokploy-network`, so the host-side numbers used by the local
-compose files (3005, 3006, 51731) are irrelevant here — and publishing any host port from
-a Dokploy stack is what produces:
+### Deploying
+
+Push first. Dokploy builds from the git remote, not from your working tree, so anything
+uncommitted or unpushed will not be in the build.
+
+1. In Dokploy, create a project, then add a service of type **Compose**.
+2. Point it at the repository and branch (`main`).
+3. Set the compose file path to `docker-compose.dokploy.yml`.
+4. Deploy. The first build takes a while — see the note on build resources below.
+5. Add a domain for the `vikado` service on port **3000**, and let Dokploy issue the
+   certificate.
+
+Deploying straight from the Dockerfile works just as well if you prefer: add a service of
+type **Application**, set the build to Dockerfile with the path `docker/Dockerfile`, and
+give it port 3000. There is only one container either way — the image builds the frontend,
+builds the server, and serves both.
+
+### Why there is a separate compose file
+
+`docker-compose.dokploy.yml` is `docker-compose.yml` with the host port mapping removed. A
+deployed stack must not publish host ports: Traefik is the ingress, the port is already
+taken on the host, and the deploy fails with
 
 ```
 Bind for 0.0.0.0:3000 failed: port is already allocated
 ```
 
-The Dokploy host already has 3000 in use. `docker-compose.dokploy.yml` therefore uses
-`expose:` rather than `ports:`, and joins `dokploy-network` as an external network.
+So it declares `expose: 3000` and joins `dokploy-network` as an external network instead.
 
-Do not deploy `docker-compose.dev.yml`. Its services are named `web` and `server` rather
-than `vikado`, and they exist to bind-mount the source tree and run `pnpm install`,
-`pnpm dev` and `cargo watch` on every boot — a laptop hot-reload loop, not a deployment.
-If a Dokploy build is failing on a container named `…-web-1` or `…-server-1`, that is the
-file it picked up.
+**Do not deploy `docker-compose.dev.yml`.** Its services are named `web` and `server`
+rather than `vikado`, and they exist to bind-mount the source tree and run `pnpm install`,
+`pnpm dev` and `cargo watch` on every boot — a laptop hot-reload loop, not a deployment. If
+a Dokploy build fails on a container named `…-web-1` or `…-server-1`, that is the file it
+picked up.
 
-Deploying from the Dockerfile directly instead of a compose file works too: Dokploy builds
-`docker/Dockerfile` and asks for one port, which is again 3000.
+### Build resources
+
+The image is a three-stage build: a pnpm frontend build, a Rust release build, then a
+Debian runtime with ffmpeg. The Rust link step is the memory-hungry part and is the usual
+cause of a build that dies without a clear error on a small VPS. Give the builder at least
+4 GB of RAM, or build the image elsewhere and deploy it by tag. The finished image is
+around 750 MB.
+
+### Before you expose it
+
+The API has no authentication and permissive CORS. Anyone who can reach the domain can
+create render jobs, upload files, and spend your CPU. Put it behind Dokploy's basic-auth
+middleware, or keep it on a private network, unless you intend it to be public. See
+[Behind a reverse proxy](#behind-a-reverse-proxy) and
+[SECURITY.md](../SECURITY.md) for the rest.
+
+Renders live in `VIKADO_DATA_DIR`, which the compose file backs with a named volume, so
+they survive redeploys and are swept on the `VIKADO_JOB_TTL_HOURS` schedule.
 
 ## Running with plain `docker run`
 
