@@ -26,16 +26,16 @@
     "clsx": "^2.1.1",
     "fix-webm-duration": "^1.0.6",
     "idb": "^8.0.3",
-    "immer": "^11.1.16",
-    "lucide-react": "^1.31.0",
-    "mediabunny": "^1.53.1",
+    "immer": "^11.1.18",
+    "lucide-react": "^1.34.0",
+    "mediabunny": "^1.55.3",
     "mp4box": "^2.4.1",
     "nanoid": "^6.0.1",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "shadcn": "^4.18.0",
+    "shadcn": "^4.19.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
@@ -45,13 +45,13 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.0.5",
-    "oxlint": "^1.78.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.80.0",
     "typescript": "~7.0.2",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }
