@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { useStore } from 'zustand'
 import { Undo2, Redo2, Download, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { redo, undo, useProjectStore } from '@/state/projectStore'
+import { useUiStore } from '@/state/uiStore'
 import { ExportDialog } from '@/export/ExportDialog'
 
 function Logo() {
@@ -20,7 +20,8 @@ function Logo() {
 }
 
 export function TopBar() {
-  const [exportOpen, setExportOpen] = useState(false)
+  const exportOpen = useUiStore((s) => s.exportOpen)
+  const setExportOpen = useUiStore((s) => s.setExportOpen)
   const name = useProjectStore((s) => s.project?.name ?? '')
   const hasClips = useProjectStore((s) =>
     s.project ? s.project.tracks.some((t) => t.clips.length > 0) : false,

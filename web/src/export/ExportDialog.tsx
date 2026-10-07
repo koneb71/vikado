@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Cpu, Download, Loader2, Server, XCircle } from 'lucide-react'
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Cpu,
+  Download,
+  Loader2,
+  Server,
+  X,
+  XCircle,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,7 +29,8 @@ import {
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/state/projectStore'
-import type { Project } from '@/schema/project'
+import { projectDuration, type Project } from '@/schema/project'
+import { exportFileName, reelReadiness, type ReelCheck } from '@/reel/readiness'
 import {
   DEFAULT_RENDER_OPTIONS,
   startExport,
@@ -160,6 +171,8 @@ export function ExportDialog({
   const project = useProjectStore.getState().project
   const size = project ? outputSize(project, options) : null
   const pitchWarning = hasPitchShiftedAudio(project)
+  const reelChecks =
+    project && size ? reelReadiness(size[0], size[1], projectDuration(project), project.fps) : null
 
   const phaseLabel =
     state?.phase === 'uploading'
@@ -294,6 +307,7 @@ export function ExportDialog({
                 </p>
               )}
             </div>
+            {reelChecks && <ReelReadiness checks={reelChecks} />}
           </div>
         ) : error ? (
           <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs">
@@ -335,7 +349,7 @@ export function ExportDialog({
             </>
           ) : downloadUrl ? (
             <Button asChild>
-              <a href={downloadUrl} download="vikado-export.mp4">
+              <a href={downloadUrl} download={exportFileName(project?.name ?? '')}>
                 <Download /> Download MP4
               </a>
             </Button>
@@ -347,5 +361,38 @@ export function ExportDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Facebook Reel requirements at a glance, for vertical projects. */
+function ReelReadiness({ checks }: { checks: ReelCheck[] }) {
+  const ready = checks.every((c) => c.ok)
+  return (
+    <div
+      className={cn(
+        'rounded-md border p-2 text-[10px] leading-snug',
+        ready ? 'border-green-500/30 bg-green-500/5' : 'border-amber-500/40 bg-amber-500/10',
+      )}
+    >
+      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium">
+        {ready ? (
+          <CheckCircle2 className="size-3.5 text-green-500" />
+        ) : (
+          <AlertTriangle className="size-3.5 text-amber-400" />
+        )}
+        {ready ? 'Facebook Reel ready' : 'Not quite Reel-ready'}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+        {checks.map((c) => (
+          <li
+            key={c.label}
+            className={cn('flex items-center gap-1', c.ok ? 'text-muted-foreground' : 'text-amber-200')}
+          >
+            {c.ok ? <Check className="size-3" /> : <X className="size-3" />}
+            {c.label}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

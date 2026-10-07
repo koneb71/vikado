@@ -71,6 +71,22 @@ It ships as a single Docker container, so the whole editor is self-hostable.
   from the Hugging Face hub on first use and cached by the browser after that. Eleven
   languages are selectable, plus auto-detect.
 
+### Facebook Reels from raw footage
+
+- **Create Reel from videos** on the home screen turns one or more raw clips into a
+  ready-to-post 9:16 project (1080×1920, 30 fps, up to 90 seconds) in one step.
+- Dead air is cut automatically. Detection runs on the cached waveform and adapts to
+  each clip's own noise floor, so quiet mics and noisy rooms both cut cleanly.
+- Portrait clips fill the frame. Landscape clips choose between a centered crop and a
+  blurred backdrop.
+- The Reel fits a 15, 30, 60 or 90 second limit by sampling every video from its
+  opening, and adds transitions between videos while jump cuts inside a clip stay hard
+  cuts.
+- Optional captions, chosen per video, come from the in-browser Whisper as short bold
+  word groups placed above Facebook's on-screen controls.
+- The result is an ordinary project to keep editing, or "Create & export" opens the
+  exporter right away. It shows a Reel-readiness checklist for any vertical project.
+
 ### Recording and capture
 
 - Screen recording and webcam recording through `MediaRecorder`, straight into the
