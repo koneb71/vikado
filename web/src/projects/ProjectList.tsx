@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Clapperboard, Plus, Trash2 } from 'lucide-react'
+import { Clapperboard, Plus, Smartphone, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -13,10 +13,12 @@ import { createAndOpenProject, useProjectStore } from '@/state/projectStore'
 import * as db from '@/media/db'
 import { projectDuration, type Project } from '@/schema/project'
 import { formatDurationShort, formatRelativeDate } from '@/lib/format'
+import { ReelWizardDialog } from '@/reel/ReelWizardDialog'
 
 export function ProjectList() {
   const [projects, setProjects] = useState<Project[] | null>(null)
   const [toDelete, setToDelete] = useState<Project | null>(null)
+  const [reelOpen, setReelOpen] = useState(false)
   const openProject = useProjectStore((s) => s.openProject)
 
   useEffect(() => {
@@ -55,6 +57,17 @@ export function ProjectList() {
             New project
           </button>
 
+          <button
+            onClick={() => setReelOpen(true)}
+            className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+          >
+            <Smartphone className="size-6" />
+            Create Reel from videos
+            <span className="-mt-1 text-[11px] text-muted-foreground/70">
+              9:16 · silences cut · captions
+            </span>
+          </button>
+
           {projects?.map((p) => (
             <div
               key={p.id}
@@ -91,6 +104,8 @@ export function ProjectList() {
           </p>
         )}
       </div>
+
+      <ReelWizardDialog open={reelOpen} onOpenChange={setReelOpen} />
 
       <Dialog open={toDelete !== null} onOpenChange={(open) => !open && setToDelete(null)}>
         <DialogContent>

@@ -12,6 +12,8 @@ browser (IndexedDB + OPFS), the backend is a stateless render service.
     `TS_RS_EXPORT_DIR=../../web/src/generated cargo test -p vikado-types export`.
   - `src/engine/` — preview: rAF loop (`PlaybackController`), WebGL2 compositor, media pool.
   - `src/editor/` — UI: timeline (pointer-event gestures), sidebar panels, inspector.
+  - `src/reel/` — "Create Reel" wizard: pure planner (silence → plan → Project, tested)
+    plus the browser glue (waveform analysis, Whisper) and `ReelWizardDialog`.
 - `crates/vikado-types` — serde+ts-rs schema (source of truth once both sides ship).
 - `crates/vikado-renderer` — Project → ffmpeg `filter_complex` compiler (overlay-stack
   model mirroring the preview), ASS emitter for text/subtitles (libass), process supervisor.

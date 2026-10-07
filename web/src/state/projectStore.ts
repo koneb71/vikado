@@ -86,7 +86,7 @@ interface ProjectState {
  * Refresh a text clip's measured block size (used by the ASS emitter to anchor
  * left/right alignment). Guarded for non-DOM environments (unit tests).
  */
-function measureTextClip(clip: TextClip): void {
+export function measureTextClip(clip: TextClip): void {
   if (typeof document === 'undefined') return
   try {
     const rendered = renderText(clip.text, clip.style)

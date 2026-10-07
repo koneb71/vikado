@@ -10,12 +10,15 @@ interface UiState {
   /** timeline dock height in px (drag-resizable) */
   timelineHeight: number
   shortcutsOpen: boolean
+  /** the export dialog; in this store so flows outside the editor can open it */
+  exportOpen: boolean
 
   setPxPerSecond: (v: number) => void
   setScrollTime: (v: number) => void
   toggleSnapping: () => void
   setTimelineHeight: (v: number) => void
   setShortcutsOpen: (open: boolean) => void
+  setExportOpen: (open: boolean) => void
   /** zoom keeping `anchorTime` fixed at the same screen x */
   zoomAt: (factor: number, anchorTime: number) => void
 }
@@ -31,6 +34,7 @@ export const useUiStore = create<UiState>()((set) => ({
   snapping: true,
   timelineHeight: 256,
   shortcutsOpen: false,
+  exportOpen: false,
 
   setPxPerSecond: (v) =>
     set({ pxPerSecond: Math.min(MAX_PX_PER_SECOND, Math.max(MIN_PX_PER_SECOND, v)) }),
@@ -39,6 +43,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setTimelineHeight: (v) =>
     set({ timelineHeight: Math.min(MAX_TIMELINE_HEIGHT, Math.max(MIN_TIMELINE_HEIGHT, v)) }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  setExportOpen: (exportOpen) => set({ exportOpen }),
   zoomAt: (factor, anchorTime) =>
     set((s) => {
       const next = Math.min(MAX_PX_PER_SECOND, Math.max(MIN_PX_PER_SECOND, s.pxPerSecond * factor))
